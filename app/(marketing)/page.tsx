@@ -5,7 +5,8 @@ import { useConvex, useMutation } from "convex/react";
 import { Show } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
-import { AppError } from "@/lib/errors";
+import { CopyButton } from "@/components/copy-button";
+import { errorMessage } from "@/lib/errors";
 import { publishHtml, type PublishResult } from "@/lib/upload";
 import { config } from "@/lib/config";
 
@@ -26,7 +27,7 @@ export default function Home() {
       setResult(await publishHtml(convex, file));
       setStatus("done");
     } catch (cause) {
-      setError(messageOf(cause));
+      setError(errorMessage(cause));
       setStatus("idle");
     }
   }
@@ -207,7 +208,7 @@ function ClaimPaste({
             await claim({ token, updateToken });
             setStatus("saved");
           } catch (cause) {
-            setError(messageOf(cause));
+            setError(errorMessage(cause));
             setStatus("idle");
           }
         }}
@@ -248,28 +249,4 @@ function Value({ value, href }: { value: string; href?: string }) {
       <CopyButton value={value} />
     </div>
   );
-}
-
-function CopyButton({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={async () => {
-        await navigator.clipboard.writeText(value);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      }}
-    >
-      {copied ? "Copied" : "Copy"}
-    </Button>
-  );
-}
-
-/** Structured errors carry a user-facing message; anything else is a surprise. */
-function messageOf(cause: unknown): string {
-  if (cause instanceof AppError) return cause.message;
-  const data = (cause as { data?: { message?: string } }).data;
-  return data?.message ?? "Something went wrong. Please try again.";
 }

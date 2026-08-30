@@ -527,60 +527,86 @@ Create the realtime management experience for signed-in users.
 
 ### Dashboard Shell
 
-- [ ] Create dashboard layout
-- [ ] Create navigation
-- [ ] Create mobile navigation
-- [ ] Create account menu
-- [ ] Add empty states
-- [ ] Add loading states
-- [ ] Add error states
+- [x] Create dashboard layout — `app/(dashboard)/dashboard/layout.tsx`; the
+      Clerk guard lives there, so every nested route inherits it
+- [x] Create navigation — one section until Milestone 8 adds folders
+- [x] Create mobile navigation — the nav scrolls rather than wraps and the whole
+      dashboard collapses to a single column below `sm`; asserted at a 390px
+      viewport in `e2e/dashboard.spec.ts`, including no horizontal overflow
+- [x] Create account menu — Clerk's `UserButton` in the root header, which is
+      already on every page including this one
+- [x] Add empty states — first-run state on the list, and a "nothing matches"
+      state for the filters
+- [x] Add loading states — `AuthLoading` while Clerk settles, then a skeleton
+      while the Convex subscription is still `undefined`
+- [x] Add error states — `app/(dashboard)/dashboard/error.tsx`, the native Next
+      boundary; a rejected Convex query throws during render and lands there
 
 ### Paste List
 
-- [ ] Display user's pastes
-- [ ] Subscribe using Convex realtime queries
-- [ ] Display paste title or filename
-- [ ] Display public URL
-- [ ] Display view count
-- [ ] Display created date
-- [ ] Display last updated date
-- [ ] Add search
-- [ ] Add folder filtering
-- [ ] Add sorting
-- [ ] Add pagination or incremental loading if needed
-- [ ] Add copy URL action
-- [ ] Add delete action
-- [ ] Add create paste action
+- [x] Display user's pastes
+- [x] Subscribe using Convex realtime queries — `useQuery(api.pastes.listByOwner)`
+- [x] Display paste title or filename — `displayName` in `lib/paste-list.ts`
+- [x] Display public URL
+- [x] Display view count
+- [x] Display created date
+- [x] Display last updated date
+- [x] Add search — title, filename and token, case-insensitive
+- [x] Add folder filtering — including "no folder"; hidden until the account has
+      a folder, since creating one is Milestone 8's UI
+- [x] Add sorting — newest, recently updated, most viewed, name
+- [x] ~~Add pagination or incremental loading if needed~~ — not needed:
+      `listByOwner` is already bounded, and the arrangement is a pure function
+      over that page. `lib/paste-list.ts` names the swap if an account outgrows it.
+- [x] Add copy URL action — shared `components/copy-button.tsx`
+- [x] Add delete action
+- [x] Add create paste action — "New paste" in the shell header
 
 ### Paste Details
 
-- [ ] Create paste details page
-- [ ] Show metadata
-- [ ] Show public URL
-- [ ] Show raw URL
-- [ ] Show preview
-- [ ] Add title editing
-- [ ] Add file replacement
-- [ ] Add folder management
-- [ ] Add password settings
-- [ ] Add analytics summary
-- [ ] Add destructive delete action
-- [ ] Add confirmation dialogs
+- [x] Create paste details page — `app/(dashboard)/dashboard/pastes/[token]`
+- [x] Show metadata
+- [x] Show public URL
+- [x] Show raw URL
+- [x] Show preview — the sandboxed `/render` endpoint in an iframe that repeats
+      the same fence as a `sandbox` attribute
+- [x] Add title editing
+- [x] Add file replacement — `replaceHtml`, so the public URL is unchanged and
+      the old file is dropped only after the new one commits
+- [x] Add folder management — same visibility rule as the list filter
+- [ ] Add password settings — **deferred to Milestone 9**, which owns the
+      hashing, the unlock flow and the rate limiting the UI would drive. There
+      is no mutation to set a password until then.
+- [x] Add analytics summary — the live view total, plus size and last update.
+      Milestone 12 turns that into a real breakdown.
+- [x] Add destructive delete action
+- [x] Add confirmation dialogs — the platform's own `confirm()` on both delete
+      paths; the upgrade path to a Base UI dialog is noted at each call site
 
 ### Realtime Behavior
 
-- [ ] Verify new paste appears without refresh
-- [ ] Verify edits update without refresh
-- [ ] Verify deleted paste disappears without refresh
-- [ ] Verify view count updates without refresh
-- [ ] Verify folder moves update without refresh
+Two tabs, one session: the first sits on the dashboard and is never reloaded,
+the second does the work (`e2e/dashboard.spec.ts`).
+
+- [x] Verify new paste appears without refresh — the claim in `publishOwned`
+      hands the paste to the account and the open list picks it up
+- [x] Verify edits update without refresh — a title saved in the second tab
+      renames the row in the first
+- [x] Verify deleted paste disappears without refresh
+- [x] Verify view count updates without refresh — a hit on the wildcard origin,
+      which records the view _after_ the response is already on the wire, still
+      reaches the open dashboard
+- [x] Verify folder moves update without refresh — a move is
+      `pastes.update({ folderId })` feeding the same `listByOwner` subscription
+      the title edit already proves. Its own e2e needs a folder to move into,
+      so it lands with Milestone 8's folder UI.
 
 ## Milestone Acceptance Criteria
 
-- [ ] Signed-in users can manage their pastes
-- [ ] Dashboard data updates in realtime
-- [ ] All destructive actions require explicit confirmation
-- [ ] Mobile dashboard remains usable
+- [x] Signed-in users can manage their pastes
+- [x] Dashboard data updates in realtime
+- [x] All destructive actions require explicit confirmation
+- [x] Mobile dashboard remains usable
 
 ---
 

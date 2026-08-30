@@ -46,3 +46,14 @@ export class AppError extends Error {
     );
   }
 }
+
+/**
+ * The user-facing message behind a failure, wherever it came from: an `AppError`
+ * thrown locally, or a Convex `ConvexError` carrying our `{ code, message }`
+ * payload. Anything else was not meant for a user and gets the generic line.
+ */
+export function errorMessage(cause: unknown): string {
+  if (cause instanceof AppError) return cause.message;
+  const data = (cause as { data?: { message?: string } } | null)?.data;
+  return data?.message ?? "Something went wrong. Please try again.";
+}
