@@ -91,77 +91,77 @@ Define the product data model and implement the domain-level backend functions r
 
 ### Schema
 
-- [ ] Create `convex/schema.ts`
-- [ ] Define the `pastes` table
-- [ ] Define the `folders` table
-- [ ] Define the `apiKeys` table
-- [ ] Define the `pasteViews` table
-- [ ] Define any required user metadata table
-- [ ] Define any required password-session table
-- [ ] Add `by_token` index to pastes
-- [ ] Add `by_custom_subdomain` index to pastes
-- [ ] Add `by_owner` index to pastes
-- [ ] Add `by_folder` index to pastes
-- [ ] Add appropriate folder ownership indexes
-- [ ] Add appropriate API-key indexes
-- [ ] Add appropriate analytics indexes
+- [x] Create `convex/schema.ts`
+- [x] Define the `pastes` table
+- [x] Define the `folders` table
+- [x] Define the `apiKeys` table
+- [x] Define the `pasteViews` table
+- [x] ~~Define any required user metadata table~~ — not required: ownership is Clerk `tokenIdentifier` on `ownerId`.
+- [x] Define any required password-session table
+- [x] Add `by_token` index to pastes
+- [x] Add `by_custom_subdomain` index to pastes
+- [x] Add `by_owner` index to pastes
+- [x] Add `by_folder` index to pastes
+- [x] Add appropriate folder ownership indexes
+- [x] Add appropriate API-key indexes
+- [x] Add appropriate analytics indexes
 
 ### Paste Domain Functions
 
-- [ ] Implement secure public token generation
-- [ ] Implement reserved-subdomain validation
-- [ ] Implement paste creation mutation
-- [ ] Implement paste metadata retrieval by token
-- [ ] Implement paste retrieval by custom subdomain
-- [ ] Implement paste listing by owner
-- [ ] Implement paste listing by folder
-- [ ] Implement paste metadata update
-- [ ] Implement paste deletion
-- [ ] Implement ownership checks
-- [ ] Implement authorization helpers
-- [ ] Implement anonymous update-token authorization
-- [ ] Implement paste visibility rules
-- [ ] Implement paste content metadata updates
-- [ ] Implement paste view-count updates
-- [ ] Implement soft-delete behavior if required
-- [ ] Implement hard-delete internal function
+- [x] Implement secure public token generation
+- [x] Implement reserved-subdomain validation
+- [x] Implement paste creation mutation
+- [x] Implement paste metadata retrieval by token
+- [x] Implement paste retrieval by custom subdomain
+- [x] Implement paste listing by owner
+- [x] Implement paste listing by folder
+- [x] Implement paste metadata update
+- [x] Implement paste deletion
+- [x] Implement ownership checks
+- [x] Implement authorization helpers
+- [x] Implement anonymous update-token authorization
+- [x] Implement paste visibility rules
+- [x] Implement paste content metadata updates
+- [x] Implement paste view-count updates
+- [x] ~~Implement soft-delete behavior if required~~ — not required: `pastes.remove` hard-deletes and drops the stored file. Add if the product needs undo.
+- [x] Implement hard-delete internal function
 
 ### Folder Domain Functions
 
-- [ ] Implement folder creation
-- [ ] Implement folder rename
-- [ ] Implement folder deletion
-- [ ] Implement folder listing
-- [ ] Implement move-paste-to-folder
-- [ ] Implement remove-paste-from-folder
-- [ ] Ensure deleting a folder does not delete contained pastes
+- [x] Implement folder creation
+- [x] Implement folder rename
+- [x] Implement folder deletion
+- [x] Implement folder listing
+- [x] Implement move-paste-to-folder — `pastes.update({ token, folderId })`
+- [x] Implement remove-paste-from-folder — `pastes.update({ token, folderId: null })`
+- [x] Ensure deleting a folder does not delete contained pastes
 
 ### User Domain Functions
 
-- [ ] Implement Clerk user identity mapping
-- [ ] Implement reusable `getCurrentUser` helper
-- [ ] Implement reusable `requireCurrentUser` helper
-- [ ] Implement user metadata initialization if needed
-- [ ] Implement owner-based access controls
+- [x] Implement Clerk user identity mapping
+- [x] Implement reusable `getCurrentUser` helper
+- [x] Implement reusable `requireCurrentUser` helper
+- [x] ~~Implement user metadata initialization if needed~~ — not needed, no user table.
+- [x] Implement owner-based access controls
 
 ### Validation
 
-- [ ] Add shared validation for paste filenames
-- [ ] Add shared validation for titles
-- [ ] Add shared validation for custom subdomains
-- [ ] Add shared validation for folder names
-- [ ] Add shared validation for file-size metadata
-- [ ] Add shared validation for content types
-- [ ] Add shared validation for API scopes
+- [x] Add shared validation for paste filenames
+- [x] Add shared validation for titles
+- [x] Add shared validation for custom subdomains
+- [x] Add shared validation for folder names
+- [x] Add shared validation for file-size metadata
+- [x] Add shared validation for content types
+- [x] Add shared validation for API scopes
 
 ## Milestone Acceptance Criteria
 
-- [ ] Convex schema deploys successfully
-- [ ] Pastes can be created, queried, updated, and deleted through Convex
-- [ ] Folder operations work
-- [ ] Owner authorization works
-- [ ] Anonymous management authorization works
-- [ ] All primary domain functions have unit tests
+- [x] Convex schema deploys successfully
+- [x] Pastes can be created, queried, updated, and deleted through Convex
+- [x] Folder operations work
+- [x] Owner authorization works
+- [x] Anonymous management authorization works
+- [x] All primary domain functions have unit tests
 
 ---
 
