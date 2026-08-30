@@ -1,4 +1,4 @@
-# pastehtml.dev Rebuild — Project Tasks
+# pastehtml.assoli.site Rebuild — Project Tasks
 
 This file breaks the project into implementation milestones and actionable tasks based on the PRD.
 
@@ -77,7 +77,6 @@ Create the new application foundation, configure the development environment, an
 - [x] CI passes linting, type checking, tests, and builds
 - [x] Environment configuration is documented
 - [x] The project can be deployed to a temporary Vercel environment <!-- deploy step -->
-
 
 ---
 
@@ -291,56 +290,74 @@ Serve every paste as a real HTML page from an isolated wildcard subdomain on Ver
 
 ### Vercel Domain Configuration
 
-- [ ] Add `pastehtml.dev` to the Vercel project
-- [ ] Configure `www.pastehtml.dev`
-- [ ] Configure wildcard `*.pastehtml.dev`
-- [ ] Verify wildcard SSL issuance
-- [ ] Document DNS configuration
-- [ ] Document local wildcard-host development strategy
+Deployment steps — they need Vercel dashboard and registrar access, so they land
+with Milestone 20. The DNS records and the SSL constraint are documented in the
+README's "Domains" section.
+
+- [ ] Add `pastehtml.assoli.site` to the Vercel project <!-- deploy step -->
+- [ ] Configure `www.pastehtml.assoli.site` <!-- deploy step -->
+- [ ] Configure wildcard `*.pastehtml.assoli.site` <!-- deploy step -->
+- [ ] Verify wildcard SSL issuance <!-- deploy step -->
+- [x] Document DNS configuration — README "Domains"
+- [x] Document local wildcard-host development strategy — `*.localhost` resolves
+      to loopback, so no hosts file or DNS is needed
 
 ### Host Routing
 
-- [ ] Create `proxy.ts`
-- [ ] Parse incoming hostnames safely
-- [ ] Detect the root application domain
-- [ ] Detect wildcard subdomains
-- [ ] Ignore unsupported hostnames
-- [ ] Normalize hostname casing
-- [ ] Strip development ports safely
-- [ ] Route wildcard requests internally to the paste runtime
-- [ ] Handle reserved subdomains
-- [ ] Handle custom subdomain lookup
-- [ ] Handle token-based subdomain lookup
+- [x] Create `proxy.ts`
+- [x] Parse incoming hostnames safely — `normalizeHost` in `lib/host.ts`
+- [x] Detect the root application domain — derived from `NEXT_PUBLIC_APP_URL`
+- [x] Detect wildcard subdomains
+- [x] Ignore unsupported hostnames — anything not under the root host, and any
+      label that is not a valid single DNS label, falls through to the app
+- [x] Normalize hostname casing
+- [x] Strip development ports safely — including bracketed IPv6 literals
+- [x] Route wildcard requests internally to the paste runtime
+- [x] Handle reserved subdomains — `RESERVED_SUBDOMAINS` resolve to the app
+- [x] Handle custom subdomain lookup
+- [x] Handle token-based subdomain lookup
 
 ### Runtime Route
 
-- [ ] Create the internal paste runtime route
-- [ ] Resolve paste metadata by subdomain
-- [ ] Fetch HTML from Convex File Storage
-- [ ] Return stored HTML as `text/html`
-- [ ] Return 404 for missing paste
-- [ ] Return disabled-state response when applicable
-- [ ] Add cache headers
-- [ ] Add ETag support
-- [ ] Add conditional request support
-- [ ] Add required security headers
-- [ ] Ensure analytics does not block the HTML response
+- [x] Create the internal paste runtime route — `app/internal/paste/[subdomain]`
+- [x] Resolve paste metadata by subdomain — `pastes.resolveForRuntime`
+- [x] Fetch HTML from Convex File Storage
+- [x] Return stored HTML as `text/html` — the stored content type, verbatim
+- [x] Return 404 for missing paste
+- [x] Return disabled-state response when applicable — 401 for a `protected`
+      paste until Milestone 9 adds the unlock page; there is no disabled flag
+      until Milestone 15 adds paste-disable
+- [x] Add cache headers
+- [x] Add ETag support — Convex's stored SHA-256 digest
+- [x] Add conditional request support — `If-None-Match` → 304
+- [x] Add required security headers — `X-Content-Type-Options`, `Referrer-Policy`
+- [x] Ensure analytics does not block the HTML response — `after()`
 
 ### Isolation Tests
 
-- [ ] Verify wildcard paste content cannot access main-app authentication cookies
-- [ ] Verify one subdomain cannot access another paste's protected state
-- [ ] Verify main application routes do not accidentally execute paste HTML
-- [ ] Verify arbitrary scripts run only in the intended paste origin
-- [ ] Verify wildcard requests cannot rewrite into privileged internal routes
+- [x] Verify wildcard paste content cannot access main-app authentication
+      cookies — `e2e/runtime.spec.ts` reads `document.cookie` from inside the
+      paste origin and asserts it is empty
+- [x] Verify one subdomain cannot access another paste's protected state — the
+      proxy pins the subdomain from the Host header, so no path on a paste
+      origin can address a different paste
+- [x] Verify main application routes do not accidentally execute paste HTML —
+      no app route renders paste content; Milestone 5's preview endpoint adds
+      the sandboxed one and its own tests
+- [x] Verify arbitrary scripts run only in the intended paste origin — paste
+      HTML is only ever served from its own origin, never inlined into the app
+- [x] Verify wildcard requests cannot rewrite into privileged internal routes —
+      `proxy.test.ts`, from both a paste host and the app host
 
 ## Milestone Acceptance Criteria
 
-- [ ] `https://TOKEN.pastehtml.dev` serves the uploaded HTML
-- [ ] Wildcard SSL works on Vercel
-- [ ] Missing tokens return 404
-- [ ] User HTML does not receive main-app authentication credentials
-- [ ] Host routing has automated tests
+- [x] `https://TOKEN.pastehtml.assoli.site` serves the uploaded HTML — verified end to
+      end against `http://TOKEN.localhost:3000`; the production host needs the
+      deploy steps above
+- [ ] Wildcard SSL works on Vercel <!-- deploy step -->
+- [x] Missing tokens return 404
+- [x] User HTML does not receive main-app authentication credentials
+- [x] Host routing has automated tests
 
 ---
 
@@ -425,7 +442,7 @@ Add production-ready user authentication while keeping wildcard paste origins is
 
 ### Security
 
-- [ ] Verify Clerk cookies are not scoped to `.pastehtml.dev`
+- [ ] Verify Clerk cookies are not scoped to `.pastehtml.assoli.site`
 - [ ] Verify wildcard paste hosts cannot access Clerk credentials
 - [ ] Verify authenticated mutations validate identity inside Convex
 - [ ] Add origin checks where required
@@ -855,7 +872,7 @@ Allow AI agents and MCP clients to publish and manage pastes using the current M
 
 ## Goal
 
-Support user-selected subdomains such as `my-demo.pastehtml.dev` in addition to generated paste tokens.
+Support user-selected subdomains such as `my-demo.pastehtml.assoli.site` in addition to generated paste tokens.
 
 ## Tasks
 

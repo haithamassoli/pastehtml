@@ -308,3 +308,90 @@ describe("views and internal deletion", () => {
     await t.mutation(internal.pastes.hardDelete, { pasteId });
   });
 });
+
+describe("pastes.resolveForRuntime", () => {
+  it("resolves a paste by its token and hands back a storage URL", async () => {
+    const t = convexTest(schema, modules);
+    const { token } = await createPaste(t, {}, "<h1>runtime</h1>");
+
+    const resolved = await t.query(api.pastes.resolveForRuntime, {
+      subdomain: token,
+    });
+
+    expect(resolved).not.toBeNull();
+    expect(resolved!.token).toBe(token);
+    expect(resolved!.visibility).toBe("public");
+    expect(resolved!.contentType).toBe("text/html");
+    expect(resolved!.contentLength).toBe("<h1>runtime</h1>".length);
+    expect(resolved!.sha256).not.toBe("");
+    expect(resolved!.url).toBeTruthy();
+  });
+
+  it("resolves a paste by its custom subdomain, case-insensitively", async () => {
+    const t = convexTest(schema, modules);
+    const { token } = await createPaste(t, { customSubdomain: "My-Demo" });
+
+    const resolved = await t.query(api.pastes.resolveForRuntime, {
+      subdomain: "my-demo",
+    });
+
+    expect(resolved!.token).toBe(token);
+  });
+
+  it("returns null for an unknown subdomain", async () => {
+    const t = convexTest(schema, modules);
+
+    expect(
+      await t.query(api.pastes.resolveForRuntime, { subdomain: "nope" }),
+    ).toBeNull();
+  });
+
+  it("returns null once the paste is deleted", async () => {
+    const t = convexTest(schema, modules);
+    const { token, updateToken } = await createPaste(t);
+    await t.mutation(api.pastes.remove, { token, updateToken });
+
+    expect(
+      await t.query(api.pastes.resolveForRuntime, { subdomain: token }),
+    ).toBeNull();
+  });
+
+  it("exposes no secrets or owner identity to the runtime", async () => {
+    const { alice } = setup();
+    const { token } = await createPaste(alice);
+
+    const resolved = await alice.query(api.pastes.resolveForRuntime, {
+      subdomain: token,
+    });
+
+    expect(Object.keys(resolved!).sort()).toEqual([
+      "contentLength",
+      "contentType",
+      "sha256",
+      "token",
+      "url",
+      "visibility",
+    ]);
+  });
+
+  it("reports a fresh digest after the content is replaced", async () => {
+    const t = convexTest(schema, modules);
+    const { token, updateToken } = await createPaste(t, {}, "<h1>before</h1>");
+    const before = await t.query(api.pastes.resolveForRuntime, {
+      subdomain: token,
+    });
+
+    await t.mutation(api.pastes.replaceContent, {
+      token,
+      updateToken,
+      storageId: await storeHtml(t, "<h1>after</h1>"),
+      contentType: "text/html",
+    });
+    const after = await t.query(api.pastes.resolveForRuntime, {
+      subdomain: token,
+    });
+
+    expect(after!.sha256).not.toBe(before!.sha256);
+    expect(after!.contentLength).toBe("<h1>after</h1>".length);
+  });
+});

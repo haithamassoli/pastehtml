@@ -2,7 +2,7 @@
 
 ## Product
 
-**pastehtml.dev — Next-Generation Rebuild**
+**pastehtml.assoli.site — Next-Generation Rebuild**
 
 ## Document Status
 
@@ -18,7 +18,7 @@
 
 ## 1. Executive Summary
 
-pastehtml.dev is a developer-focused platform for publishing raw HTML files as live web pages with minimal friction.
+pastehtml.assoli.site is a developer-focused platform for publishing raw HTML files as live web pages with minimal friction.
 
 The current product will be rebuilt without Ruby or Rails. The new version will use a TypeScript-first architecture built around Next.js, Convex, and Vercel.
 
@@ -27,7 +27,7 @@ The rebuilt product must preserve the core behavior of the existing service whil
 A central product requirement is that uploaded HTML can be served as a real web page on an isolated wildcard subdomain such as:
 
 ```text
-https://abc123.pastehtml.dev
+https://abc123.pastehtml.assoli.site
 ```
 
 The product must also provide raw content access, preview/render routes, authenticated account features, folders, API keys, programmatic publishing, analytics, and MCP integration.
@@ -43,7 +43,7 @@ The ideal workflow should be:
 ```text
 HTML in
   ↓
-pastehtml.dev
+pastehtml.assoli.site
   ↓
 Public URL out
 ```
@@ -138,7 +138,7 @@ Typical workflow:
 
 ```text
 Generate HTML
-→ POST HTML to pastehtml.dev
+→ POST HTML to pastehtml.assoli.site
 → receive URL
 → return URL to user
 ```
@@ -206,7 +206,7 @@ The shortest supported flow should remain:
 ```bash
 curl --data-binary @page.html \
   -H "Content-Type: text/html" \
-  https://pastehtml.dev/api/pastes
+  https://pastehtml.assoli.site/api/pastes
 ```
 
 The response should contain the published URL and identifiers needed to manage the paste.
@@ -219,10 +219,10 @@ The application must never assume uploaded HTML is safe.
 
 ### 7.3 Main-App Authentication Must Be Isolated
 
-Authentication credentials for `pastehtml.dev` must not be exposed to content served from:
+Authentication credentials for `pastehtml.assoli.site` must not be exposed to content served from:
 
 ```text
-*.pastehtml.dev
+*.pastehtml.assoli.site
 ```
 
 ### 7.4 Preserve Original Content
@@ -276,7 +276,7 @@ Hosting
                  ┌─────────────┴─────────────┐
                  │                           │
                  ▼                           ▼
-          pastehtml.dev              *.pastehtml.dev
+       pastehtml.assoli.site      *.pastehtml.assoli.site
                  │                           │
          Main Application              Paste Runtime
                  │                           │
@@ -477,7 +477,7 @@ Initial supported methods should include:
 Authentication cookies for the main application must not be broadly scoped to:
 
 ```text
-.pastehtml.dev
+.pastehtml.assoli.site
 ```
 
 They should remain scoped to the main application host whenever possible.
@@ -502,8 +502,8 @@ Example response:
 ```json
 {
   "id": "abc123",
-  "url": "https://abc123.pastehtml.dev",
-  "rawUrl": "https://pastehtml.dev/p/abc123/raw",
+  "url": "https://abc123.pastehtml.assoli.site",
+  "rawUrl": "https://pastehtml.assoli.site/p/abc123/raw",
   "updateToken": "..."
 }
 ```
@@ -581,7 +581,7 @@ abc123
 must be available at:
 
 ```text
-https://abc123.pastehtml.dev
+https://abc123.pastehtml.assoli.site
 ```
 
 ### 15.2 Routing
@@ -591,7 +591,7 @@ Next.js host-based routing should detect wildcard subdomains and internally rout
 Conceptually:
 
 ```text
-abc123.pastehtml.dev/
+abc123.pastehtml.assoli.site/
         ↓
 /runtime/abc123
 ```
@@ -625,7 +625,7 @@ The paste runtime is responsible for serving uploaded HTML.
 ### 16.1 Root Request
 
 ```http
-GET https://abc123.pastehtml.dev/
+GET https://abc123.pastehtml.assoli.site/
 ```
 
 Expected behavior:
@@ -1119,7 +1119,7 @@ Requirements include:
 - accessible dialogs,
 - screen-reader-friendly errors.
 
-Uploaded user HTML is not required to meet pastehtml.dev accessibility standards because it is user-provided content.
+Uploaded user HTML is not required to meet pastehtml.assoli.site accessibility standards because it is user-provided content.
 
 ---
 
@@ -1312,9 +1312,9 @@ Where practical, existing URLs should continue working.
 Important URLs include:
 
 ```text
-https://TOKEN.pastehtml.dev
-https://pastehtml.dev/p/TOKEN/raw
-https://pastehtml.dev/p/TOKEN/render
+https://TOKEN.pastehtml.assoli.site
+https://pastehtml.assoli.site/p/TOKEN/raw
+https://pastehtml.assoli.site/p/TOKEN/render
 ```
 
 Existing paste tokens should not change during migration unless technically unavoidable.
@@ -1403,9 +1403,9 @@ Preview infrastructure must never accidentally write to production data.
 Production should support:
 
 ```text
-pastehtml.dev
-www.pastehtml.dev
-*.pastehtml.dev
+pastehtml.assoli.site
+www.pastehtml.assoli.site
+*.pastehtml.assoli.site
 ```
 
 Wildcard DNS and Vercel project configuration must be documented.
@@ -1484,7 +1484,7 @@ Initial product behavior may use the paste token as the subdomain.
 If custom subdomains are supported:
 
 ```text
-my-demo.pastehtml.dev
+my-demo.pastehtml.assoli.site
 ```
 
 Requirements:
@@ -1731,7 +1731,7 @@ Build this vertical slice first:
 2. Store bytes in Convex File Storage
 3. Store metadata in Convex
 4. Generate token
-5. Publish at TOKEN.pastehtml.dev
+5. Publish at TOKEN.pastehtml.assoli.site
 6. Expose /p/TOKEN/raw
 7. Update paste
 8. Delete paste
@@ -1790,7 +1790,7 @@ Monitoring
 
 The rebuild is complete when a user can:
 
-1. open `pastehtml.dev`,
+1. open `pastehtml.assoli.site`,
 2. upload an HTML document,
 3. receive a public wildcard-subdomain URL,
 4. open that URL as a functioning web page,

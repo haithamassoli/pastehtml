@@ -12,7 +12,7 @@ import { ConvexClientProvider } from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "pastehtml.dev",
+  title: "pastehtml",
   description: "Publish HTML and get an instant public URL.",
 };
 

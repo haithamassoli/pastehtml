@@ -350,3 +350,46 @@ export const getOwned = query({
     return ownerPaste(paste);
   },
 });
+
+/**
+ * Everything the wildcard runtime needs to serve a paste, in one round trip:
+ * a signed storage URL plus the headers to send with it. Lookup is by custom
+ * subdomain first, then by public token — both indexed.
+ */
+export const resolveForRuntime = query({
+  args: { subdomain: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      token: v.string(),
+      visibility: v.union(v.literal("public"), v.literal("protected")),
+      contentType: v.string(),
+      contentLength: v.number(),
+      // Convex's stored digest, used verbatim as the ETag.
+      sha256: v.string(),
+      // `null` if the stored object has gone missing.
+      url: v.union(v.string(), v.null()),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const subdomain = args.subdomain.trim().toLowerCase();
+    const paste =
+      (await ctx.db
+        .query("pastes")
+        .withIndex("by_custom_subdomain", (q) =>
+          q.eq("customSubdomain", subdomain),
+        )
+        .unique()) ?? (await byToken(ctx, subdomain));
+    if (!paste) return null;
+
+    const metadata = await ctx.db.system.get("_storage", paste.storageId);
+    return {
+      token: paste.token,
+      visibility: paste.visibility,
+      contentType: paste.contentType,
+      contentLength: paste.contentLength,
+      sha256: metadata?.sha256 ?? "",
+      url: metadata ? await ctx.storage.getUrl(paste.storageId) : null,
+    };
+  },
+});
