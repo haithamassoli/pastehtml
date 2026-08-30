@@ -226,6 +226,26 @@ protection) from the keys in `.env.local`. Override the fixture address with
 - `app/internal/paste/[subdomain]` — the paste runtime; reachable only through
   the rewrite in `proxy.ts`, never directly.
 
+### App shell, PWA and SEO
+
+`app/layout.tsx` holds the site-wide `metadata` — title template, description,
+canonical, Open Graph and Twitter card — with `metadataBase` taken from
+`NEXT_PUBLIC_APP_URL`, so a preview deployment advertises itself rather than
+production. The card image is generated at `app/opengraph-image.tsx` through
+`next/og`, so the pitch on it lives in one place instead of in a committed PNG.
+
+`app/manifest.ts`, `app/icon.svg`, `app/apple-icon.png` and `public/icon-*.png`
+make the app installable; `public/sw.js` is a hand-written service worker (~40
+lines, no build step) that precaches `/offline` and answers a failed page
+navigation with it. It touches nothing else: the API, MCP, sign-in and every
+paste-content path are excluded, and a paste origin is a different origin
+entirely, so no published page is ever in its reach.
+
+Status pages share `components/status-page.tsx`: `app/not-found.tsx` (404),
+`app/error.tsx` and `app/global-error.tsx` (500), and `app/422` — the page that
+states what an upload has to satisfy, with the limits imported from the
+validators that enforce them.
+
 See `docs/conventions.md` for naming and error-code conventions, `docs/api.md`
 for the REST API reference, `docs/mcp.md` for the MCP server, and
 `docs/tasks.md` for the milestone plan.

@@ -11,6 +11,7 @@ import { Show } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/copy-button";
+import { UrlRow } from "@/components/paste-fields";
 import { errorMessage } from "@/lib/errors";
 import { publishHtml, type PublishResult } from "@/lib/upload";
 import { config } from "@/lib/config";
@@ -146,7 +147,10 @@ export default function Home() {
         )}
         {error && (
           <p role="alert" className="text-destructive text-sm">
-            {error}
+            {error}{" "}
+            <a href="/422" className="underline underline-offset-4">
+              What pastehtml accepts
+            </a>
           </p>
         )}
       </div>
@@ -271,28 +275,11 @@ function ClaimPaste({
   );
 }
 
-function UrlRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium">{label}</p>
-      <Value value={value} href={value} />
-    </div>
-  );
-}
-
-function Value({ value, href }: { value: string; href?: string }) {
+/** The update token: a secret, so it is shown as code and never as a link. */
+function Value({ value }: { value: string }) {
   return (
     <div className="border-border flex items-center gap-2 rounded-lg border p-2">
-      {href ? (
-        <a
-          href={href}
-          className="flex-1 truncate font-mono text-sm underline-offset-4 hover:underline"
-        >
-          {value}
-        </a>
-      ) : (
-        <code className="flex-1 truncate font-mono text-sm">{value}</code>
-      )}
+      <code className="flex-1 truncate font-mono text-sm">{value}</code>
       <CopyButton value={value} />
     </div>
   );

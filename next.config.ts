@@ -43,6 +43,8 @@ const APP_PAGES = [
   "/dashboard/:path*",
   "/sign-in/:path*",
   "/sign-up/:path*",
+  "/422",
+  "/offline",
 ];
 
 /**
@@ -100,6 +102,24 @@ const nextConfig: NextConfig = {
         has: appHost,
         headers: [{ key: "Content-Security-Policy", value: CSP }],
       })),
+      {
+        // The service worker outlives a deploy unless the browser is told not
+        // to keep it: a cached `sw.js` would go on serving the previous
+        // shell. It is also the one script that can intercept navigations, so
+        // it gets a policy that lets it load nothing at all.
+        source: "/sw.js",
+        has: appHost,
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-cache, no-store, must-revalidate",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: "default-src 'self'; script-src 'self'",
+          },
+        ],
+      },
     ];
   },
 };
