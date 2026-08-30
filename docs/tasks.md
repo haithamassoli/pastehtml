@@ -290,14 +290,15 @@ Serve every paste as a real HTML page from an isolated wildcard subdomain on Ver
 
 ### Vercel Domain Configuration
 
-Deployment steps — they need Vercel dashboard and registrar access, so they land
-with Milestone 20. The DNS records and the SSL constraint are documented in the
-README's "Domains" section.
+Verified live on 2026-08-30 against `pastehtml.assoli.site`.
 
-- [ ] Add `pastehtml.assoli.site` to the Vercel project <!-- deploy step -->
-- [ ] Configure `www.pastehtml.assoli.site` <!-- deploy step -->
-- [ ] Configure wildcard `*.pastehtml.assoli.site` <!-- deploy step -->
-- [ ] Verify wildcard SSL issuance <!-- deploy step -->
+- [x] Add `pastehtml.assoli.site` to the Vercel project — serves `HTTP/2 200`
+- [x] Configure `www.pastehtml.assoli.site` — `200`; `www` is reserved, so host
+      routing hands it to the app
+- [x] Configure wildcard `*.pastehtml.assoli.site` — an arbitrary subdomain
+      reaches the runtime rather than `DEPLOYMENT_NOT_FOUND`
+- [x] Verify wildcard SSL issuance — Let's Encrypt `CN=*.pastehtml.assoli.site`,
+      valid to 2026-11-28, `SSL certificate verify ok`
 - [x] Document DNS configuration — README "Domains"
 - [x] Document local wildcard-host development strategy — `*.localhost` resolves
       to loopback, so no hosts file or DNS is needed
@@ -351,11 +352,12 @@ README's "Domains" section.
 
 ## Milestone Acceptance Criteria
 
-- [x] `https://TOKEN.pastehtml.assoli.site` serves the uploaded HTML — verified end to
-      end against `http://TOKEN.localhost:3000`; the production host needs the
-      deploy steps above
-- [ ] Wildcard SSL works on Vercel <!-- deploy step -->
-- [x] Missing tokens return 404
+- [x] `https://TOKEN.pastehtml.assoli.site` serves the uploaded HTML — the full
+      publish-then-serve path is covered end to end by `e2e/runtime.spec.ts`; in
+      production the routing, lookup and headers are confirmed live
+- [x] Wildcard SSL works on Vercel — Let's Encrypt wildcard certificate issued
+- [x] Missing tokens return 404 — live: an unknown subdomain returns
+      `404 Paste not found.` with `no-store` and the runtime's security headers
 - [x] User HTML does not receive main-app authentication credentials
 - [x] Host routing has automated tests
 
@@ -371,43 +373,54 @@ Provide raw source retrieval and a controlled preview/render route.
 
 ### Raw Endpoint
 
-- [ ] Implement `GET /p/[token]/raw`
-- [ ] Load the original stored HTML
-- [ ] Return the original content without rendering it in the application
-- [ ] Set an appropriate `Content-Type`
-- [ ] Set an appropriate filename header
-- [ ] Add ETag support
-- [ ] Add conditional requests
-- [ ] Define caching behavior
-- [ ] Verify byte-level output against stored content
+- [x] Implement `GET /p/[token]/raw`
+- [x] Load the original stored HTML — streamed from Convex File Storage
+- [x] Return the original content without rendering it in the application —
+      `text/plain` + `nosniff`, so the app origin never parses paste markup
+- [x] Set an appropriate `Content-Type`
+- [x] Set an appropriate filename header — an RFC 5987 `Content-Disposition`
+      naming the uploaded file
+- [x] Add ETag support — Convex's stored SHA-256 digest
+- [x] Add conditional requests — `If-None-Match` → 304, storage never read
+- [x] Define caching behavior — `public, max-age=0, must-revalidate`, as the
+      wildcard runtime; Milestone 16 tunes both together
+- [x] Verify byte-level output against stored content — unit test over
+      BOM/multi-byte/CR/tab bytes, plus `e2e/preview.spec.ts` comparing the
+      published buffer
 
 ### Preview Endpoint
 
-- [ ] Implement `GET /p/[token]/render`
-- [ ] Return HTML preview
-- [ ] Add sandbox-oriented Content Security Policy
-- [ ] Prevent access to main-application cookies
-- [ ] Prevent privileged application API access
-- [ ] Test scripts inside the preview
-- [ ] Test forms inside the preview
-- [ ] Test modal behavior if supported
-- [ ] Verify unsafe capabilities remain blocked
+- [x] Implement `GET /p/[token]/render`
+- [x] Return HTML preview
+- [x] Add sandbox-oriented Content Security Policy — a `sandbox` directive
+      granting only scripts, forms, modals, popups and downloads
+- [x] Prevent access to main-application cookies — no `allow-same-origin`, so
+      the document is an opaque origin; `document.cookie` throws
+- [x] Prevent privileged application API access — an opaque origin cannot make a
+      credentialed same-origin request
+- [x] Test scripts inside the preview — e2e asserts the paste's own script ran
+- [x] Test forms inside the preview — e2e submits a form inside the preview
+- [x] Test modal behavior if supported — e2e asserts `alert()` opens a dialog
+- [x] Verify unsafe capabilities remain blocked — e2e asserts `window.origin`
+      is `null` and both cookies and `localStorage` raise `SecurityError`
 
 ### Metadata Page
 
-- [ ] Implement `GET /p/[token]`
-- [ ] Show paste information
-- [ ] Show public URL
-- [ ] Show raw URL
-- [ ] Show preview link
-- [ ] Show ownership controls when authorized
+- [x] Implement `GET /p/[token]`
+- [x] Show paste information — title, filename, size, views, publish date
+- [x] Show public URL
+- [x] Show raw URL
+- [x] Show preview link
+- [x] Show ownership controls when authorized — `isViewerOwner` is decided by
+      Convex from the caller's own identity; the entry point renders only for
+      the owner, and the controls themselves land with Milestone 7's detail page
 
 ## Milestone Acceptance Criteria
 
-- [ ] Raw endpoint returns the stored content correctly
-- [ ] Preview endpoint works with explicit sandboxing
-- [ ] Metadata page works for public pastes
-- [ ] Raw output passes byte-level regression tests
+- [x] Raw endpoint returns the stored content correctly
+- [x] Preview endpoint works with explicit sandboxing
+- [x] Metadata page works for public pastes
+- [x] Raw output passes byte-level regression tests
 
 ---
 

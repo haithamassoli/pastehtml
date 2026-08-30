@@ -163,7 +163,15 @@ export const getByToken = query({
   args: { token: v.string() },
   handler: async (ctx, args) => {
     const paste = await byToken(ctx, args.token);
-    return paste ? publicPaste(paste) : null;
+    if (!paste) return null;
+    const user = await getCurrentUser(ctx);
+    return {
+      ...publicPaste(paste),
+      // Whether *this* caller owns it, so a public page can decide whether to
+      // offer management controls. Derived from the caller's own identity, so
+      // an unauthenticated read always gets `false`.
+      isViewerOwner: user !== null && paste.ownerId === user.id,
+    };
   },
 });
 
@@ -352,9 +360,10 @@ export const getOwned = query({
 });
 
 /**
- * Everything the wildcard runtime needs to serve a paste, in one round trip:
- * a signed storage URL plus the headers to send with it. Lookup is by custom
- * subdomain first, then by public token — both indexed.
+ * Everything a serving surface needs to hand over a paste, in one round trip:
+ * a signed storage URL plus the headers to send with it. Used by the wildcard
+ * runtime and by the `/p/[token]` raw and preview endpoints. Lookup is by
+ * custom subdomain first, then by public token — both indexed.
  */
 export const resolveForRuntime = query({
   args: { subdomain: v.string() },
@@ -362,6 +371,8 @@ export const resolveForRuntime = query({
     v.null(),
     v.object({
       token: v.string(),
+      // The uploaded name, for the raw endpoint's `Content-Disposition`.
+      filename: v.string(),
       visibility: v.union(v.literal("public"), v.literal("protected")),
       contentType: v.string(),
       contentLength: v.number(),
@@ -385,6 +396,7 @@ export const resolveForRuntime = query({
     const metadata = await ctx.db.system.get("_storage", paste.storageId);
     return {
       token: paste.token,
+      filename: paste.filename,
       visibility: paste.visibility,
       contentType: paste.contentType,
       contentLength: paste.contentLength,

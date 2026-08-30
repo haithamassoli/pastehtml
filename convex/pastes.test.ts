@@ -367,6 +367,7 @@ describe("pastes.resolveForRuntime", () => {
     expect(Object.keys(resolved!).sort()).toEqual([
       "contentLength",
       "contentType",
+      "filename",
       "sha256",
       "token",
       "url",
