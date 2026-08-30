@@ -96,6 +96,14 @@ export default defineSchema({
     // Revoking every session for a paste when its password changes.
     .index("by_paste", ["pasteId"]),
 
+  // REST API request throttling, one row per (bucket, client). Rewritten in
+  // place; a cron drops windows that have reset.
+  rateLimits: defineTable({
+    key: v.string(),
+    count: v.number(),
+    resetAt: v.number(),
+  }).index("by_key", ["key"]),
+
   // Password-attempt throttling, one row per (paste, client). Rewritten in
   // place rather than appended to, so the table stays bounded.
   unlockAttempts: defineTable({

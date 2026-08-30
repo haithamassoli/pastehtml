@@ -167,6 +167,23 @@ open http://<token>.localhost:3000         # the paste that token published
 `lib/host.ts` derives the root host from `NEXT_PUBLIC_APP_URL` and ignores the
 port, so the same routing code runs in development and production.
 
+## REST API
+
+HTML can be published in one request, with or without an account:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/pastes \
+     -H 'Content-Type: text/html' --data-binary @index.html
+```
+
+`GET`, `PATCH` and `DELETE` on `/api/v1/pastes/{token}` read, update and remove
+it. Three credentials are accepted — an `Authorization: Bearer ph_…` API key, a
+Clerk session token, or the `X-Update-Token` an anonymous paste was published
+with — and every one of them is verified inside Convex, never at the edge.
+
+See `docs/api.md` for the full reference: request shapes, error codes and rate
+limits.
+
 ## Testing
 
 `npm run test` runs the Vitest suites (Convex functions under `convex-test`,
@@ -195,5 +212,5 @@ protection) from the keys in `.env.local`. Override the fixture address with
 - `app/internal/paste/[subdomain]` — the paste runtime; reachable only through
   the rewrite in `proxy.ts`, never directly.
 
-See `docs/conventions.md` for naming and error-code conventions, and
-`docs/tasks.md` for the milestone plan.
+See `docs/conventions.md` for naming and error-code conventions, `docs/api.md`
+for the REST API reference, and `docs/tasks.md` for the milestone plan.

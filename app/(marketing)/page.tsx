@@ -118,6 +118,8 @@ export default function Home() {
         </Button>
       </form>
 
+      <ApiExample />
+
       <div aria-live="polite" className="min-h-6">
         {busy && (
           // ponytail: indeterminate — fetch() exposes no upload progress.
@@ -133,6 +135,35 @@ export default function Home() {
         )}
       </div>
     </main>
+  );
+}
+
+/**
+ * The same publish, from a terminal. One request, no account, no JSON wrapper —
+ * which is the whole point of the API, so it belongs on the page that sells it.
+ */
+function ApiExample() {
+  const command = `curl -X POST ${config.appUrl}/api/v1/pastes \\\n     -H 'Content-Type: text/html' --data-binary @index.html`;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm font-medium">Or from your terminal</p>
+      <div className="border-border flex items-start gap-2 rounded-lg border p-3">
+        <pre className="flex-1 overflow-x-auto font-mono text-xs leading-relaxed">
+          {command}
+        </pre>
+        <CopyButton value={command} />
+      </div>
+      <p className="text-muted-foreground text-sm">
+        Returns the public URL and an update token.{" "}
+        <a
+          href="https://github.com/goldentik/pastehtml/blob/main/docs/api.md"
+          className="underline underline-offset-4"
+        >
+          API reference
+        </a>
+      </p>
+    </div>
   );
 }
 

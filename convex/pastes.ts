@@ -12,6 +12,7 @@ import {
   getCurrentUser,
   requireCurrentUser,
   requireOwner,
+  requireScope,
   requireUpdateToken,
 } from "./lib/auth";
 import {
@@ -111,8 +112,19 @@ async function requireOwnFolder(
     fail("NOT_FOUND", "Folder not found.");
 }
 
+/**
+ * The credentials any surface may present alongside a paste mutation. The
+ * browser sends neither and is identified by its Clerk session; the REST API
+ * forwards whichever the request carried.
+ */
+const credentialArgs = {
+  updateToken: v.optional(v.string()),
+  apiKey: v.optional(v.string()),
+};
+
 export const create = mutation({
   args: {
+    ...credentialArgs,
     storageId: v.id("_storage"),
     filename: v.string(),
     contentType: v.string(),
@@ -128,7 +140,8 @@ export const create = mutation({
     updateToken: v.optional(v.string()),
   }),
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
+    const user = await getCurrentUser(ctx, { apiKey: args.apiKey });
+    if (user) requireScope(user, "pastes:write");
     const now = Date.now();
 
     if (args.folderId) await requireOwnFolder(ctx, args.folderId, user?.id);
@@ -222,8 +235,8 @@ export const listByFolder = query({
 
 export const update = mutation({
   args: {
+    ...credentialArgs,
     token: v.string(),
-    updateToken: v.optional(v.string()),
     title: v.optional(v.string()),
     description: v.optional(v.string()),
     filename: v.optional(v.string()),
@@ -234,7 +247,7 @@ export const update = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const paste = await requireByToken(ctx, args.token);
-    await authorizePasteWrite(ctx, paste, args.updateToken);
+    await authorizePasteWrite(ctx, paste, args);
 
     const patch: Partial<Doc<"pastes">> = { updatedAt: Date.now() };
     if (args.title !== undefined) patch.title = validateTitle(args.title);
@@ -265,8 +278,8 @@ export const update = mutation({
  */
 export const replaceContent = mutation({
   args: {
+    ...credentialArgs,
     token: v.string(),
-    updateToken: v.optional(v.string()),
     storageId: v.id("_storage"),
     contentType: v.string(),
     filename: v.optional(v.string()),
@@ -274,7 +287,7 @@ export const replaceContent = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const paste = await requireByToken(ctx, args.token);
-    await authorizePasteWrite(ctx, paste, args.updateToken);
+    await authorizePasteWrite(ctx, paste, args);
     await requireUnreferenced(ctx, args.storageId, paste._id);
     const upload = await describeUpload(ctx, args.storageId, args.contentType);
 
@@ -326,11 +339,11 @@ export const claim = mutation({
 });
 
 export const remove = mutation({
-  args: { token: v.string(), updateToken: v.optional(v.string()) },
+  args: { ...credentialArgs, token: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
     const paste = await requireByToken(ctx, args.token);
-    await authorizePasteWrite(ctx, paste, args.updateToken);
+    await authorizePasteWrite(ctx, paste, args, "pastes:delete");
     await hardDeletePaste(ctx, paste);
     return null;
   },
@@ -385,11 +398,12 @@ export const recordView = mutation({
 
 /** Owner-only detail view, used by the dashboard. */
 export const getOwned = query({
-  args: { token: v.string() },
+  args: { token: v.string(), apiKey: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const user = await requireCurrentUser(ctx);
+    const user = await requireCurrentUser(ctx, { apiKey: args.apiKey });
     const paste = await requireByToken(ctx, args.token);
     requireOwner(user, paste);
+    requireScope(user, "pastes:read");
     return ownerPaste(paste);
   },
 });
@@ -503,15 +517,11 @@ async function revokeUnlocks(ctx: MutationCtx, pasteId: Id<"pastes">) {
  * effect for visitors immediately.
  */
 export const setPassword = mutation({
-  args: {
-    token: v.string(),
-    updateToken: v.optional(v.string()),
-    password: v.string(),
-  },
+  args: { ...credentialArgs, token: v.string(), password: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
     const paste = await requireByToken(ctx, args.token);
-    await authorizePasteWrite(ctx, paste, args.updateToken);
+    await authorizePasteWrite(ctx, paste, args);
 
     await ctx.db.patch("pastes", paste._id, {
       passwordHash: await hashPassword(validatePassword(args.password)),
@@ -525,11 +535,11 @@ export const setPassword = mutation({
 
 /** Removes password protection and makes the paste public again. */
 export const removePassword = mutation({
-  args: { token: v.string(), updateToken: v.optional(v.string()) },
+  args: { ...credentialArgs, token: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
     const paste = await requireByToken(ctx, args.token);
-    await authorizePasteWrite(ctx, paste, args.updateToken);
+    await authorizePasteWrite(ctx, paste, args);
 
     await ctx.db.patch("pastes", paste._id, {
       passwordHash: undefined,

@@ -1,16 +1,35 @@
 // Browser publishing flow: the HTML goes straight from the browser to Convex
 // File Storage, so it never passes through a Vercel function.
-import type { ConvexReactClient } from "convex/react";
+import type {
+  FunctionArgs,
+  FunctionReference,
+  FunctionReturnType,
+} from "convex/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { AppError } from "./errors";
 import { pasteUrls } from "./urls";
 import { MAX_UPLOAD_BYTES } from "@/convex/lib/validation";
 
+/**
+ * Anything that can run a Convex mutation. Both `ConvexReactClient` (the
+ * browser) and `ConvexHttpClient` (the REST API, server-side) satisfy it, so
+ * the publish flow below is shared rather than written twice.
+ */
+export type Mutator = {
+  mutation<M extends FunctionReference<"mutation">>(
+    reference: M,
+    args: FunctionArgs<M>,
+  ): Promise<FunctionReturnType<M>>;
+};
+
 export type PublishOptions = {
   title?: string;
   description?: string;
   customSubdomain?: string;
+  folderId?: Id<"folders">;
+  /** API-key credential, when publishing on behalf of an automation. */
+  apiKey?: string;
 };
 
 /** The create-paste response contract, shared by every publishing surface. */
@@ -25,7 +44,7 @@ export type PublishResult = {
 
 /** Uploads one file and returns its Convex storage id. */
 export async function uploadFile(
-  convex: ConvexReactClient,
+  convex: Mutator,
   file: File | Blob,
 ): Promise<Id<"_storage">> {
   if (file.size === 0) throw new AppError("VALIDATION", "File is empty.");
@@ -57,7 +76,7 @@ export async function uploadFile(
  * them, so there is nothing to unwind here.
  */
 export async function publishHtml(
-  convex: ConvexReactClient,
+  convex: Mutator,
   file: File,
   options: PublishOptions = {},
 ): Promise<PublishResult> {
@@ -76,9 +95,9 @@ export async function publishHtml(
  * only drops the old one once the new storage id is committed.
  */
 export async function replaceHtml(
-  convex: ConvexReactClient,
+  convex: Mutator,
   file: File,
-  paste: { token: string; updateToken?: string },
+  paste: { token: string; updateToken?: string; apiKey?: string },
 ): Promise<void> {
   const storageId = await uploadFile(convex, file);
   await convex.mutation(api.pastes.replaceContent, {

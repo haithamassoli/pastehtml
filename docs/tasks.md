@@ -490,9 +490,10 @@ Add production-ready user authentication while keeping wildcard paste origins is
       with a bearer JWT rather than cookies, and the app has no Server Actions or
       cookie-authenticated mutating route, so no endpoint is reachable
       cross-site with ambient credentials
-- [x] ~~Add CSRF protections where required~~ — same reason. Milestone 15
-      re-audits this with the full header and CSP pass, and Milestone 10 must
-      re-check it when the REST API lands.
+- [x] ~~Add CSRF protections where required~~ — same reason at the time. Now
+      required and done: Milestone 10's REST API does accept the Clerk cookie,
+      so `lib/api.ts` refuses a cookie-only write carrying a foreign `Origin`.
+      Milestone 15 re-audits with the full header and CSP pass.
 - [x] Test logout invalidation — `e2e/auth.spec.ts` signs out and the next
       `/dashboard` request is bounced to `/sign-in`
 
@@ -754,71 +755,100 @@ Provide a stable automation-friendly API for developers, scripts, and AI systems
 
 ### API Infrastructure
 
-- [ ] Define API versioning strategy
-- [ ] Define standard JSON success format
-- [ ] Define standard JSON error format
-- [ ] Define API error codes
-- [ ] Add request IDs
-- [ ] Add API rate limiting
-- [ ] Add API logging without storing secrets or HTML payloads unnecessarily
+- [x] Define API versioning strategy — path-based `/api/v1`, additive changes
+      only within a version; documented in `docs/api.md`
+- [x] Define standard JSON success format — `{ data }`, via `ok()` in `lib/api.ts`
+- [x] Define standard JSON error format — `{ error: { code, message } }`
+- [x] Define API error codes — the existing `ErrorCode` set in `lib/errors.ts`;
+      `toAppError` maps a Convex rejection onto it and refuses to pass through a
+      code it does not recognise
+- [x] Add request IDs — `X-Request-Id` on every response, echoing an incoming one
+- [x] Add API rate limiting — `convex/rateLimit.ts`, per caller per minute, with
+      `RateLimit-*` headers; 240 reads / 60 writes
+- [x] Add API logging without storing secrets or HTML payloads unnecessarily —
+      `logger.child({ requestId })` logs the operation and its outcome only; the
+      body is never logged and `lib/logger.ts` redacts token-shaped fields
+- [x] Re-check CSRF, deferred here from Milestone 6 — the API accepts a Clerk
+      cookie and a `text/plain` POST is CORS-simple, so cookie-only writes now
+      require a same-origin `Origin`; header credentials and scripts are
+      unaffected
 
 ### Create Paste
 
-- [ ] Implement `POST /api/pastes`
-- [ ] Accept raw `text/html`
-- [ ] Validate request size
-- [ ] Upload HTML to Convex File Storage
-- [ ] Create paste metadata
-- [ ] Support anonymous creation
-- [ ] Support authenticated creation
-- [ ] Support API-key creation
-- [ ] Return public URL
-- [ ] Return raw URL
-- [ ] Return anonymous update token when applicable
+- [x] Implement `POST /api/pastes` — `POST /api/v1/pastes`
+- [x] Accept raw `text/html` — the body _is_ the HTML, so `--data-binary @file`
+      and a shell pipe both work; metadata rides in the query string
+- [x] Validate request size — `Content-Length` first, then the actual bytes, then
+      the stored object's own size inside Convex, which cannot be lied about
+- [x] Upload HTML to Convex File Storage — the same `publishHtml` the browser
+      uses; `lib/upload.ts` now takes any Convex client
+- [x] Create paste metadata
+- [x] Support anonymous creation
+- [x] Support authenticated creation — Clerk session token or cookie
+- [x] Support API-key creation — `Authorization: Bearer ph_…`
+- [x] Return public URL
+- [x] Return raw URL
+- [x] Return anonymous update token when applicable
 
 ### Retrieve Paste Metadata
 
-- [ ] Implement `GET /api/pastes/[token]`
-- [ ] Return public metadata
-- [ ] Return owner-only metadata when authorized
+- [x] Implement `GET /api/pastes/[token]` — `GET /api/v1/pastes/[token]`
+- [x] Return public metadata
+- [x] Return owner-only metadata when authorized — the owner view is tried first
+      and falls back to the public one; Convex decides which the caller gets
 
 ### Update Paste
 
-- [ ] Implement `PATCH /api/pastes/[token]`
-- [ ] Support owner authentication
-- [ ] Support API-key authentication
-- [ ] Support anonymous update token
-- [ ] Support content replacement
-- [ ] Support title update
-- [ ] Support folder update where applicable
-- [ ] Support password settings only when appropriately authorized
+- [x] Implement `PATCH /api/pastes/[token]`
+- [x] Support owner authentication
+- [x] Support API-key authentication
+- [x] Support anonymous update token — `X-Update-Token`, its own header so it can
+      never be confused with a bearer credential
+- [x] Support content replacement — an HTML body replaces the content, a JSON
+      body edits the metadata
+- [x] Support title update
+- [x] Support folder update where applicable — `folderId`, `null` to unfile
+- [x] Support password settings only when appropriately authorized — `password`
+      goes through `setPassword`/`removePassword`, not `update`, because
+      changing it revokes every outstanding unlock session
 
 ### Delete Paste
 
-- [ ] Implement `DELETE /api/pastes/[token]`
-- [ ] Support owner authentication
-- [ ] Support API-key authentication
-- [ ] Support anonymous update token
-- [ ] Remove public availability immediately
-- [ ] Trigger storage cleanup
+- [x] Implement `DELETE /api/pastes/[token]`
+- [x] Support owner authentication
+- [x] Support API-key authentication — requires the `pastes:delete` scope
+- [x] Support anonymous update token
+- [x] Remove public availability immediately — the row goes in the transaction
+      that authorized the delete, so the wildcard URL 404s at once
+- [x] Trigger storage cleanup — `hardDeletePaste` drops the stored file with it
 
 ### Documentation
 
-- [ ] Document `curl` publishing
-- [ ] Document API authentication
-- [ ] Document create request
-- [ ] Document update request
-- [ ] Document delete request
-- [ ] Document error codes
-- [ ] Document rate limits
-- [ ] Add API examples to the home page
+- [x] Document `curl` publishing — `docs/api.md`, plus the README
+- [x] Document API authentication — all three credentials and what each grants
+- [x] Document create request
+- [x] Document update request
+- [x] Document delete request
+- [x] Document error codes
+- [x] Document rate limits
+- [x] Add API examples to the home page — a copyable one-line `curl`
 
 ## Milestone Acceptance Criteria
 
-- [ ] HTML can be published with a single API request
-- [ ] Anonymous and authenticated API flows work
-- [ ] API errors are consistent
-- [ ] Existing important API behavior is preserved where practical
+- [x] HTML can be published with a single API request
+- [x] Anonymous and authenticated API flows work — anonymous end to end in
+      `e2e/api.spec.ts`; the owner and API-key paths in `convex/apiKeys.test.ts`,
+      where the authorization actually happens
+- [x] API errors are consistent — one envelope, one code set, asserted across
+      400/401/403/404/409/413/415 in `e2e/api.spec.ts`
+- [x] Existing important API behavior is preserved where practical
+
+### Carried into Milestone 11
+
+API-key _authentication_ landed here because the API needs it: `convex/lib/
+apiKeys.ts` (generate, hash, verify, expiry, revocation) plus `apiKeys.create`,
+with scopes enforced inside Convex. Milestone 11 still owns the settings UI,
+listing, revocation and `lastUsedAt`.
 
 ---
 
@@ -1621,7 +1651,7 @@ The rebuild is considered complete when all launch-critical milestones are compl
 - [x] Folder management works
 - [x] Password protection works
 - [ ] API keys work
-- [ ] REST API publishing works
+- [x] REST API publishing works
 - [ ] MCP publishing works
 - [ ] Analytics works without blocking public responses
 - [ ] Security isolation between app and paste origins is verified

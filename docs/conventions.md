@@ -19,6 +19,9 @@
 - Success: `{ data: ... }`. Error: `{ error: { code, message } }` via
   `AppError.toResponse()` (see `lib/errors.ts`).
 - Every handler mints/propagates a request id (`lib/request-id.ts`).
+- Handlers are wrapped in `route()` from `lib/api.ts`, which does the request
+  id, the rate limit, the same-origin check on writes, and error normalization.
+  Authorization itself always happens inside Convex, never in the handler.
 
 ## Error codes
 

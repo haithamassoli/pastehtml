@@ -12,4 +12,7 @@ crons.interval(
   {},
 );
 
+// Rate-limit windows are only useful until they reset.
+crons.interval("sweep rate limits", { hours: 1 }, internal.rateLimit.sweep, {});
+
 export default crons;
