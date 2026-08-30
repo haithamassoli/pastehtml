@@ -13,11 +13,13 @@ import {
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { CopyButton } from "@/components/copy-button";
+import { CustomSubdomain } from "./custom-subdomain";
 import { Button } from "@/components/ui/button";
 import { errorMessage } from "@/lib/errors";
 import { displayName, isoDate } from "@/lib/paste-list";
 import { replaceHtml } from "@/lib/upload";
 import { pasteUrls } from "@/lib/urls";
+import { PasteAnalytics } from "./analytics";
 
 export default function PasteDetailPage({
   params,
@@ -132,10 +134,7 @@ function PasteDetail({ token }: { token: string }) {
         </p>
       )}
 
-      {/* Analytics summary. Milestone 12 turns the view total into a real
-          breakdown; the total itself is already live. */}
-      <dl className="text-muted-foreground grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
-        <Fact label="Views" value={String(paste.viewsCount)} />
+      <dl className="text-muted-foreground grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
         <Fact label="Filename" value={paste.filename} />
         <Fact
           label="Size"
@@ -143,6 +142,10 @@ function PasteDetail({ token }: { token: string }) {
         />
         <Fact label="Updated" value={isoDate(paste.updatedAt)} />
       </dl>
+
+      {/* Owns the view total as well as the breakdown, on its own live
+          subscription — `getOwned` above no longer has to carry it. */}
+      <PasteAnalytics token={token} />
 
       <div className="flex flex-col gap-4">
         <UrlRow label="Public URL" value={urls.publicUrl} />
@@ -226,6 +229,8 @@ function PasteDetail({ token }: { token: string }) {
           </select>
         </Section>
       )}
+
+      <CustomSubdomain token={token} current={paste.customSubdomain} />
 
       <Section title="Password protection">
         <p className="text-muted-foreground text-xs">

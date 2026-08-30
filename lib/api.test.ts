@@ -1,6 +1,26 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ConvexError } from "convex/values";
-import { credentialsFrom, errorResponse, ok, toAppError } from "./api";
+
+// `route` charges the rate limit through Convex before it reaches the handler,
+// so the client is stubbed and nothing here talks to a deployment.
+const { mutation } = vi.hoisted(() => ({
+  mutation: vi.fn(async () => ({
+    ok: true,
+    limit: 60,
+    remaining: 59,
+    resetAt: Date.now() + 60_000,
+  })),
+}));
+
+vi.mock("convex/browser", () => ({
+  ConvexHttpClient: class {
+    query = vi.fn();
+    mutation = mutation;
+  },
+}));
+
+const { credentialsFrom, errorResponse, ok, route, toAppError } =
+  await import("./api");
 import { AppError } from "./errors";
 import { REQUEST_ID_HEADER } from "./request-id";
 
@@ -92,5 +112,41 @@ describe("response envelopes", () => {
     expect(await response.json()).toEqual({
       error: { code: "RATE_LIMITED", message: "Too many requests." },
     });
+  });
+});
+
+describe("cross-origin writes", () => {
+  const write = route("api:write", async ({ id }) => ok({ written: true }, id));
+  const post = (headers: Record<string, string>) =>
+    write(
+      new Request("http://localhost:3000/api/v1/pastes", {
+        method: "POST",
+        headers,
+      }),
+      undefined,
+    );
+
+  it("refuses a cookie-only write from a paste origin", async () => {
+    // The product parks hostile HTML one label away from the app, so the origin
+    // check has to compare hosts exactly. A suffix match would hand every paste
+    // a forged write carrying its visitor's session.
+    const response = await post({ origin: "http://abc123.localhost:3000" });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error.code).toBe("FORBIDDEN");
+  });
+
+  it("lets a header credential through from anywhere", async () => {
+    // An API key or update token cannot be attached by a page the user merely
+    // visited, so the origin is not what protects those — and our own origin
+    // and a script that sends no Origin at all are ordinary callers.
+    const cases: Record<string, string>[] = [
+      { origin: "https://evil.example", authorization: "Bearer ph_secret" },
+      { origin: "https://evil.example", "x-update-token": "secret" },
+      { origin: "http://localhost:3000" },
+      {},
+    ];
+    for (const headers of cases)
+      expect((await post(headers)).status, JSON.stringify(headers)).toBe(200);
   });
 });

@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useConvex, useMutation } from "convex/react";
+import {
+  Authenticated,
+  useConvex,
+  useConvexAuth,
+  useMutation,
+} from "convex/react";
 import { Show } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -14,6 +19,10 @@ type Status = "idle" | "publishing" | "done";
 
 export default function Home() {
   const convex = useConvex();
+  // Publishing before Convex has settled the Clerk token would create the paste
+  // as anonymous, and a signed-in author would silently not own what they just
+  // published. It resolves in a moment for a visitor too, so everyone waits.
+  const { isLoading: authPending } = useConvexAuth();
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PublishResult | null>(null);
@@ -42,7 +51,7 @@ export default function Home() {
   if (status === "done" && result)
     return <Published result={result} onPublishAnother={publishAnother} />;
 
-  const busy = status === "publishing";
+  const busy = status === "publishing" || authPending;
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-8 p-6">
@@ -53,6 +62,13 @@ export default function Home() {
         <p className="text-muted-foreground">
           Drop an HTML file and it goes live instantly. No account needed.
         </p>
+        {/* Only once Convex holds the token, so this is also the honest signal
+            that the next publish will be owned rather than anonymous. */}
+        <Authenticated>
+          <p className="text-muted-foreground text-sm">
+            Publishing to your account.
+          </p>
+        </Authenticated>
       </div>
 
       <label
@@ -121,7 +137,7 @@ export default function Home() {
       <ApiExample />
 
       <div aria-live="polite" className="min-h-6">
-        {busy && (
+        {status === "publishing" && (
           // ponytail: indeterminate — fetch() exposes no upload progress.
           // Swap in XMLHttpRequest.upload.onprogress if a real bar is wanted.
           <div className="bg-muted h-1.5 overflow-hidden rounded-full">

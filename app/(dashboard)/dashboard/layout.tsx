@@ -35,6 +35,12 @@ export default async function DashboardLayout({
         >
           Folders
         </Link>
+        <Link
+          href="/dashboard/settings/api-keys"
+          className="font-medium whitespace-nowrap"
+        >
+          API keys
+        </Link>
       </nav>
       {children}
     </div>

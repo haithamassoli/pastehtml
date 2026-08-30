@@ -40,10 +40,25 @@ publishing anonymously needs none.
 | Clerk session token | `Authorization: Bearer <jwt>` | Everything the signed-in user can do         |
 | Update token        | `X-Update-Token: <token>`     | Manage one anonymous paste                   |
 
-An **API key** is created in the dashboard and shown once. Its scopes are
-checked inside the backend, not at the edge: `pastes:read` for `GET`,
-`pastes:write` for `POST`/`PATCH`, `pastes:delete` for `DELETE`. A key belongs
-to an account, so it can never manage a paste that belongs to nobody.
+An **API key** is created at
+[/dashboard/settings/api-keys](https://pastehtml.assoli.site/dashboard/settings/api-keys)
+and shown once — only its SHA-256 is stored, so a lost key is replaced, never
+recovered. Its scopes are checked inside the backend, not at the edge, so a key
+can never do more by taking a different route in:
+
+| Scope           | Allows                                                                 |
+| --------------- | ---------------------------------------------------------------------- |
+| `pastes:read`   | `GET` a paste, including its owner-only fields                         |
+| `pastes:write`  | `POST` a new paste, `PATCH` an existing one                            |
+| `pastes:delete` | `DELETE` a paste                                                       |
+| `folders:read`  | Read folders                                                           |
+| `folders:write` | Create, rename and delete folders, and move a paste into or out of one |
+
+A key belongs to an account, so it can never manage a paste that belongs to
+nobody. Give it an optional expiry date at creation, and revoke it at any time
+from the same page — both take effect on the next request, with no way to tell
+from the outside which of the two happened, or whether the key ever existed.
+The dashboard also shows when each key was last presented, to the minute.
 
 A **browser session** is the one credential a browser attaches by itself, so a
 write authorized by nothing else must come from this site: a `POST`, `PATCH` or
@@ -144,6 +159,20 @@ DELETE /api/v1/pastes/{token}
 The paste row and its stored HTML go together, in the transaction that
 authorized the delete — the public URL stops resolving right away.
 
+## Report abuse
+
+```http
+POST /api/v1/abuse
+Content-Type: application/json
+
+{ "token": "abc123def456", "reason": "phishing page for a bank" }
+```
+
+No credential, and nothing about the reporter is recorded — a report is a
+favour, and an address we could not act on would only be personal data to
+protect. `token` may be the paste's token or its custom subdomain; an unknown
+one is a `404`. Answers `202` once the report is queued for a human.
+
 ## Responses
 
 Success is always `{ "data": … }`; failure is always
@@ -164,8 +193,8 @@ Success is always `{ "data": … }`; failure is always
 
 ## Rate limits
 
-Per minute, per caller — an API key is charged to the key, a signed-in browser
-to its session, everyone else to their address:
+Per minute, per caller — an API key is charged to the key, everyone else
+(including a browser session, which presents no key) to their address:
 
 | Bucket                    | Limit |
 | ------------------------- | ----- |
@@ -175,3 +204,14 @@ to its session, everyone else to their address:
 Every response carries `RateLimit-Limit`, `RateLimit-Remaining` and
 `RateLimit-Reset` (seconds until the window resets). Over the limit is a
 `429 RATE_LIMITED`; wait for the reset and retry.
+
+Underneath those, the backend charges the operations themselves — publishing,
+editing and deleting — so the ceiling is the same whichever door a client comes
+in by. Those answer `429 RATE_LIMITED` without `RateLimit-*` headers, because
+the budget they spent is not per-request and not per-caller.
+
+## MCP
+
+The same operations are available to AI agents over the Model Context
+Protocol at `POST /mcp`, with the same API keys and the same error codes. See
+`docs/mcp.md`.

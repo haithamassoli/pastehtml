@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import {
   internalMutation,
   mutation,
@@ -7,6 +7,8 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
+import { userAgentFamilyValidator } from "./schema";
 import {
   authorizePasteWrite,
   getCurrentUser,
@@ -22,6 +24,7 @@ import {
   sha256Hex,
 } from "./lib/tokens";
 import { hashPassword, validatePassword, verifyPassword } from "./lib/password";
+import { enforce } from "./rateLimit";
 import { describeUpload, deleteFile, requireUnreferenced } from "./storage";
 import {
   fail,
@@ -61,6 +64,9 @@ function ownerPaste(paste: Doc<"pastes">) {
     storageId: paste.storageId,
     // Whether a password is set — never the hash itself.
     hasPassword: paste.passwordHash !== undefined,
+    // Present only on a paste taken down for abuse, so the owner is not left
+    // guessing why their URL stopped answering.
+    disabledAt: paste.disabledAt,
   };
 }
 
@@ -86,6 +92,17 @@ async function uniqueToken(ctx: QueryCtx): Promise<string> {
   fail("INTERNAL", "Could not allocate a paste token.");
 }
 
+/**
+ * Validates a requested subdomain and proves it is still free.
+ *
+ * This is where the assignment race is won: a Convex mutation is one
+ * serializable transaction, so the availability read below and the write that
+ * follows it commit together or not at all, and OCC aborts and retries any
+ * mutation whose reads were invalidated by a commit in between. Two callers
+ * racing for the same name therefore cannot both see it free — the loser
+ * re-runs, reads the winner's row and fails with `CONFLICT`. No reservation
+ * row and no lock, as long as this read stays inside the mutation that writes.
+ */
 async function claimSubdomain(
   ctx: QueryCtx,
   subdomain: string,
@@ -111,6 +128,15 @@ async function requireOwnFolder(
   if (!folder || folder.ownerId !== ownerId)
     fail("NOT_FOUND", "Folder not found.");
 }
+
+/**
+ * Who a mutation on an existing paste is charged to. An owned paste is charged
+ * to its account; an anonymous one to itself, because its update token is the
+ * only thing holding it and there is no identity behind it to name. Both keep
+ * the budget local, so no one caller can spend another's.
+ */
+const writeClient = (paste: Doc<"pastes">) =>
+  paste.ownerId ? `user:${paste.ownerId}` : `paste:${paste._id}`;
 
 /**
  * The credentials any surface may present alongside a paste mutation. The
@@ -142,9 +168,19 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx, { apiKey: args.apiKey });
     if (user) requireScope(user, "pastes:write");
+    // The unbypassable limit: the browser reaches this mutation directly, so
+    // the REST limiter never sees it. An account is charged to itself; every
+    // anonymous author shares one global budget, because a Convex mutation
+    // cannot see a client address and a caller-supplied one would be a lie.
+    await enforce(ctx, "paste:create", user ? `user:${user.id}` : "anon");
     const now = Date.now();
 
-    if (args.folderId) await requireOwnFolder(ctx, args.folderId, user?.id);
+    // Filing into a folder edits folder membership, so it needs the folder
+    // scope on top of the paste one — the same rule `update` applies below.
+    if (args.folderId) {
+      if (user) requireScope(user, "folders:write");
+      await requireOwnFolder(ctx, args.folderId, user?.id);
+    }
     await requireUnreferenced(ctx, args.storageId);
     const upload = await describeUpload(ctx, args.storageId, args.contentType);
 
@@ -206,10 +242,38 @@ export const getByCustomSubdomain = query({
   },
 });
 
-export const listByOwner = query({
-  args: { limit: v.optional(v.number()) },
+/**
+ * Availability for the dashboard's live indicator. A rejection comes back as a
+ * value rather than a throw, because half a typed name is not an error worth
+ * an error boundary. `token` is the paste doing the asking, so its own current
+ * subdomain reads as available — the same no-op re-assign `update` allows.
+ *
+ * Advisory only: the answer can be stale by the time the owner submits, and
+ * `update` re-checks inside the transaction that actually writes.
+ */
+export const checkSubdomain = query({
+  args: { subdomain: v.string(), token: v.optional(v.string()) },
+  returns: v.object({ available: v.boolean(), reason: v.optional(v.string()) }),
   handler: async (ctx, args) => {
-    const user = await requireCurrentUser(ctx);
+    const self = args.token ? await byToken(ctx, args.token) : null;
+    try {
+      await claimSubdomain(ctx, args.subdomain, self?._id);
+      return { available: true };
+    } catch (error) {
+      if (!(error instanceof ConvexError)) throw error;
+      return {
+        available: false,
+        reason: (error.data as { message: string }).message,
+      };
+    }
+  },
+});
+
+export const listByOwner = query({
+  args: { limit: v.optional(v.number()), apiKey: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const user = await requireCurrentUser(ctx, { apiKey: args.apiKey });
+    requireScope(user, "pastes:read");
     const pastes = await ctx.db
       .query("pastes")
       .withIndex("by_owner", (q) => q.eq("ownerId", user.id))
@@ -240,6 +304,13 @@ export const update = mutation({
     title: v.optional(v.string()),
     description: v.optional(v.string()),
     filename: v.optional(v.string()),
+    // Assign, change and remove are all this one field: a value claims it,
+    // `null` gives it up. Authorized by `authorizePasteWrite` below, so an
+    // anonymous paste's update-token holder may claim a name too — the token is
+    // that paste's only credential, and refusing them would just push vanity
+    // names behind a sign-up.
+    // ponytail: which means anonymous squatting is possible. Milestone 15's
+    // abuse pass is where to meter it, not here.
     customSubdomain: v.optional(v.union(v.string(), v.null())),
     // `null` removes the paste from its folder.
     folderId: v.optional(v.union(v.id("folders"), v.null())),
@@ -247,7 +318,8 @@ export const update = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const paste = await requireByToken(ctx, args.token);
-    await authorizePasteWrite(ctx, paste, args);
+    const user = await authorizePasteWrite(ctx, paste, args);
+    await enforce(ctx, "paste:write", writeClient(paste));
 
     const patch: Partial<Doc<"pastes">> = { updatedAt: Date.now() };
     if (args.title !== undefined) patch.title = validateTitle(args.title);
@@ -261,6 +333,9 @@ export const update = mutation({
           ? undefined
           : await claimSubdomain(ctx, args.customSubdomain, paste._id);
     if (args.folderId !== undefined) {
+      // What is being edited here is folder membership, so a key scoped to
+      // pastes alone cannot refile its owner's pastes.
+      if (user) requireScope(user, "folders:write");
       if (args.folderId !== null)
         await requireOwnFolder(ctx, args.folderId, paste.ownerId);
       patch.folderId = args.folderId ?? undefined;
@@ -288,6 +363,7 @@ export const replaceContent = mutation({
   handler: async (ctx, args) => {
     const paste = await requireByToken(ctx, args.token);
     await authorizePasteWrite(ctx, paste, args);
+    await enforce(ctx, "paste:write", writeClient(paste));
     await requireUnreferenced(ctx, args.storageId, paste._id);
     const upload = await describeUpload(ctx, args.storageId, args.contentType);
 
@@ -344,6 +420,7 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     const paste = await requireByToken(ctx, args.token);
     await authorizePasteWrite(ctx, paste, args, "pastes:delete");
+    await enforce(ctx, "paste:write", writeClient(paste));
     await hardDeletePaste(ctx, paste);
     return null;
   },
@@ -371,25 +448,45 @@ async function hardDeletePaste(ctx: MutationCtx, paste: Doc<"pastes">) {
  * Records a view. Public because the wildcard runtime calls it for anonymous
  * visitors; it is scheduled, never awaited, so HTML delivery never blocks.
  */
+/**
+ * The referring site, never the referring page. A full Referer URL carries a
+ * path and a query string that can name the visitor or what they searched for;
+ * the host answers the only question the dashboard asks of it.
+ */
+function referrerHost(referrer?: string): string | undefined {
+  if (!referrer) return undefined;
+  try {
+    return new URL(referrer).host || undefined;
+  } catch {
+    // Already a bare host, or junk. Bounded either way.
+    return referrer.slice(0, 100).trim() || undefined;
+  }
+}
+
 export const recordView = mutation({
   args: {
     token: v.string(),
+    // ISO 3166-1 alpha-2, from the edge. Nothing narrower is asked for, and
+    // the address it was derived from never reaches here.
     country: v.optional(v.string()),
     referrer: v.optional(v.string()),
-    userAgentFamily: v.optional(v.string()),
+    userAgentFamily: v.optional(userAgentFamilyValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const paste = await byToken(ctx, args.token);
     if (!paste) return null;
+    const country = args.country?.trim().toUpperCase();
     await ctx.db.patch("pastes", paste._id, {
       viewsCount: paste.viewsCount + 1,
     });
     await ctx.db.insert("pasteViews", {
       pasteId: paste._id,
       timestamp: Date.now(),
-      country: args.country,
-      referrer: args.referrer,
+      // Normalized here rather than at the caller: this is a public mutation,
+      // so the serving route is not the only thing that can reach it.
+      country: country && /^[A-Z]{2}$/.test(country) ? country : undefined,
+      referrer: referrerHost(args.referrer),
       userAgentFamily: args.userAgentFamily,
     });
     return null;
@@ -416,6 +513,9 @@ export const getOwned = query({
  *
  * A protected paste with no valid unlock session comes back `locked`, with no
  * URL and no digest: the content is withheld here, not at the serving layer.
+ * A paste disabled for abuse comes back the same way — and because the URL is
+ * withheld rather than the row hidden, every surface that serves stored bytes
+ * stops without each one needing to know about the flag.
  */
 export const resolveForRuntime = query({
   args: { subdomain: v.string(), unlockToken: v.optional(v.string()) },
@@ -428,11 +528,14 @@ export const resolveForRuntime = query({
       visibility: v.union(v.literal("public"), v.literal("protected")),
       // Password protected, and this caller has not unlocked it.
       locked: v.boolean(),
+      // Taken down by `admin.disable`. No password will open it.
+      disabled: v.boolean(),
       contentType: v.string(),
       contentLength: v.number(),
       // Convex's stored digest, used verbatim as the ETag.
       sha256: v.string(),
-      // `null` if the stored object has gone missing, or the paste is locked.
+      // `null` if the stored object has gone missing, or the paste is locked
+      // or disabled.
       url: v.union(v.string(), v.null()),
     }),
   ),
@@ -447,18 +550,21 @@ export const resolveForRuntime = query({
         .unique()) ?? (await byToken(ctx, subdomain));
     if (!paste) return null;
 
+    const disabled = paste.disabledAt !== undefined;
     const locked =
       paste.visibility === "protected" &&
       !(await hasValidUnlock(ctx, paste._id, args.unlockToken));
 
-    const metadata = locked
-      ? null
-      : await ctx.db.system.get("_storage", paste.storageId);
+    const metadata =
+      locked || disabled
+        ? null
+        : await ctx.db.system.get("_storage", paste.storageId);
     return {
       token: paste.token,
       filename: paste.filename,
       visibility: paste.visibility,
       locked,
+      disabled,
       contentType: paste.contentType,
       contentLength: paste.contentLength,
       sha256: metadata?.sha256 ?? "",
@@ -472,13 +578,66 @@ export const resolveForRuntime = query({
 /** How long an unlock lasts before the visitor is challenged again. */
 export const UNLOCK_TTL_MS = 12 * 60 * 60 * 1000;
 
-// ponytail: throttling is per (paste, client-IP). It stops the practical
-// online attack without letting one attacker lock a shared paste out for
-// everyone; an attacker with a pool of addresses still gets
-// MAX_UNLOCK_ATTEMPTS per address, which Milestone 15's global rate limiting
-// is where to fix.
+// Two caps, because one is not enough. `unlock` is a public Convex mutation and
+// `client` is a string the caller picks — the browser bundle carries the Convex
+// URL, so an attacker calling the backend directly invents a fresh identifier
+// per guess and the per-client cap never trips. An edge-supplied identifier is
+// not a security boundary; the per-paste cap is the one that binds, because it
+// counts failures against the paste itself whatever the caller calls itself.
+//
+// ponytail: the per-client cap stays, and stays first, because it gives an
+// honest visitor a budget of their own rather than a share of a pool an
+// attacker is draining. The trade-off in the per-paste cap is availability: a
+// paste under attack is closed to everyone, correct password included, until
+// the window resets — 100 wrong guesses in 15 minutes is far more than a shared
+// link's honest typo rate, and 15 minutes is the whole of the outage.
 export const MAX_UNLOCK_ATTEMPTS = 10;
+export const MAX_UNLOCK_ATTEMPTS_PER_PASTE = 100;
 export const UNLOCK_WINDOW_MS = 15 * 60 * 1000;
+
+/**
+ * The client column for the per-paste cap. A caller who sends this literally
+ * only charges their own guesses twice, which is not a trade anyone wants.
+ */
+const ANY_CLIENT = "*";
+
+const attemptRow = (ctx: QueryCtx, pasteId: Id<"pastes">, client: string) =>
+  ctx.db
+    .query("unlockAttempts")
+    .withIndex("by_paste_and_client", (q) =>
+      q.eq("pasteId", pasteId).eq("client", client),
+    )
+    .unique();
+
+/** Failures in the window that is currently open; 0 once it has reset. */
+async function failureCount(
+  ctx: QueryCtx,
+  pasteId: Id<"pastes">,
+  client: string,
+  now: number,
+): Promise<number> {
+  const row = await attemptRow(ctx, pasteId, client);
+  return row && row.resetAt > now ? row.count : 0;
+}
+
+/** Adds one failure, opening a new window if the last has already reset. */
+async function recordFailure(
+  ctx: MutationCtx,
+  pasteId: Id<"pastes">,
+  client: string,
+  now: number,
+): Promise<void> {
+  const existing = await attemptRow(ctx, pasteId, client);
+  const live = existing && existing.resetAt > now ? existing : null;
+  const record = {
+    pasteId,
+    client,
+    count: (live?.count ?? 0) + 1,
+    resetAt: live?.resetAt ?? now + UNLOCK_WINDOW_MS,
+  };
+  if (existing) await ctx.db.replace("unlockAttempts", existing._id, record);
+  else await ctx.db.insert("unlockAttempts", record);
+}
 
 /** True when `unlockToken` names a live session for exactly this paste. */
 async function hasValidUnlock(
@@ -522,6 +681,7 @@ export const setPassword = mutation({
   handler: async (ctx, args) => {
     const paste = await requireByToken(ctx, args.token);
     await authorizePasteWrite(ctx, paste, args);
+    await enforce(ctx, "paste:write", writeClient(paste));
 
     await ctx.db.patch("pastes", paste._id, {
       passwordHash: await hashPassword(validatePassword(args.password)),
@@ -540,6 +700,7 @@ export const removePassword = mutation({
   handler: async (ctx, args) => {
     const paste = await requireByToken(ctx, args.token);
     await authorizePasteWrite(ctx, paste, args);
+    await enforce(ctx, "paste:write", writeClient(paste));
 
     await ctx.db.patch("pastes", paste._id, {
       passwordHash: undefined,
@@ -593,35 +754,31 @@ export const unlock = mutation({
 
     const now = Date.now();
     const client = args.client.slice(0, 64);
-    const attempts = await ctx.db
-      .query("unlockAttempts")
-      .withIndex("by_paste_and_client", (q) =>
-        q.eq("pasteId", paste._id).eq("client", client),
-      )
-      .unique();
-    const live = attempts && attempts.resetAt > now ? attempts : null;
+    const mine = await failureCount(ctx, paste._id, client, now);
+    const anyone = await failureCount(ctx, paste._id, ANY_CLIENT, now);
 
-    if (live && live.count >= MAX_UNLOCK_ATTEMPTS) {
+    if (
+      mine >= MAX_UNLOCK_ATTEMPTS ||
+      anyone >= MAX_UNLOCK_ATTEMPTS_PER_PASTE
+    ) {
       // Safe to log: the paste and the source, never the attempted password.
       console.warn(
-        `unlock throttled paste=${paste._id} client=${client} count=${live.count}`,
+        `unlock throttled paste=${paste._id} client=${client} mine=${mine} anyone=${anyone}`,
       );
       return { ok: false, reason: "throttled" } as const;
     }
 
     if (!(await verifyPassword(args.password, paste.passwordHash))) {
-      const record = {
-        pasteId: paste._id,
-        client,
-        count: (live?.count ?? 0) + 1,
-        resetAt: live?.resetAt ?? now + UNLOCK_WINDOW_MS,
-      };
-      if (attempts)
-        await ctx.db.replace("unlockAttempts", attempts._id, record);
-      else await ctx.db.insert("unlockAttempts", record);
+      await recordFailure(ctx, paste._id, client, now);
+      await recordFailure(ctx, paste._id, ANY_CLIENT, now);
       return invalid;
     }
 
+    // Only this client's budget is returned. The per-paste window is left to
+    // expire on its own: past its cap nothing can succeed, so a success can
+    // never be what clears it, and treating one correct password as proof that
+    // the flood is over would just hand the attacker the reset.
+    const attempts = await attemptRow(ctx, paste._id, client);
     if (attempts) await ctx.db.delete("unlockAttempts", attempts._id);
 
     // Self-cleaning: expired sessions for this paste go on the way past, so
@@ -641,5 +798,31 @@ export const unlock = mutation({
       expiresAt,
     });
     return { ok: true, unlockToken, expiresAt } as const;
+  },
+});
+
+/**
+ * Drops attempt windows that have already reset. `rateLimits` has the same
+ * cron, and for the same reason: the per-paste cap counts a caller-supplied
+ * `client`, so a guesser inventing a fresh one per attempt grows this table
+ * without bound. Batched like the other sweeps.
+ */
+export const sweepUnlockAttempts = internalMutation({
+  args: { cursor: v.optional(v.union(v.string(), v.null())) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const cutoff = Date.now();
+    const page = await ctx.db
+      .query("unlockAttempts")
+      .paginate({ cursor: args.cursor ?? null, numItems: 200 });
+
+    for (const row of page.page)
+      if (row.resetAt <= cutoff) await ctx.db.delete("unlockAttempts", row._id);
+
+    if (!page.isDone)
+      await ctx.scheduler.runAfter(0, internal.pastes.sweepUnlockAttempts, {
+        cursor: page.continueCursor,
+      });
+    return null;
   },
 });

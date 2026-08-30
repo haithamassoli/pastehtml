@@ -99,18 +99,23 @@ export async function requireUpdateToken(
  * a signed-in session or one of its API keys, carrying `scope`; anonymous
  * pastes require the raw update token issued at creation. An API key belongs to
  * an account, so it can never manage a paste that belongs to nobody.
+ *
+ * Returns the authorized caller, or `null` for the anonymous-token case, so a
+ * handler that needs a second scope check (moving a paste between folders) has
+ * the identity without verifying the same credential twice.
  */
 export async function authorizePasteWrite(
   ctx: QueryCtx,
   paste: Doc<"pastes">,
   credentials: Credentials = {},
   scope: Scope = "pastes:write",
-): Promise<void> {
+): Promise<CurrentUser | null> {
   if (paste.ownerId) {
     const user = await requireCurrentUser(ctx, credentials);
     requireOwner(user, paste);
     requireScope(user, scope);
-    return;
+    return user;
   }
   await requireUpdateToken(paste, credentials.updateToken);
+  return null;
 }

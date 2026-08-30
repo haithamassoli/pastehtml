@@ -77,11 +77,22 @@ function requireSameOrigin(request: Request, credentials: ApiCredentials) {
     );
 }
 
+/**
+ * Private by default. A `GET` on a paste returns the owner view when the caller
+ * owns it and the public view when they do not, so the same URL has two answers
+ * and neither a browser nor a proxy may keep either. Cheap enough to state on
+ * every response rather than reason about which ones carry owner data.
+ */
+const PRIVATE_CACHE = "private, no-store";
+
 /** Success envelope. Every response carries the correlation id back. */
 export function ok(data: unknown, id: string, status = 200): Response {
   return Response.json(
     { data },
-    { status, headers: { [REQUEST_ID_HEADER]: id } },
+    {
+      status,
+      headers: { [REQUEST_ID_HEADER]: id, "Cache-Control": PRIVATE_CACHE },
+    },
   );
 }
 
@@ -128,10 +139,20 @@ export function route<C = unknown>(
     try {
       if (bucket === "api:write") requireSameOrigin(request, credentials);
 
-      const limit = await convex.mutation(api.rateLimit.consume, {
-        bucket,
-        client: rateLimitClient(request, credentials),
-      });
+      // ponytail: `lastUsedAt` needs a mutation, because verification happens
+      // in a query and queries cannot write. Rather than teach the rate limiter
+      // about API keys, this rides alongside the charge it already makes — two
+      // requests in flight at once, so it costs no extra round-trip. Convex
+      // itself throttles the write to once a minute per key.
+      const [limit] = await Promise.all([
+        convex.mutation(api.rateLimit.consume, {
+          bucket,
+          client: rateLimitClient(request, credentials),
+        }),
+        credentials.apiKey
+          ? convex.mutation(api.apiKeys.touch, { key: credentials.apiKey })
+          : null,
+      ]);
       if (!limit.ok) {
         log.warn("api rate limited", { bucket });
         return errorResponse(
@@ -178,6 +199,13 @@ export function errorResponse(
 ): Response {
   return Response.json(
     { error: { code: error.code, message: error.message } },
-    { status: error.status, headers: { ...headers, [REQUEST_ID_HEADER]: id } },
+    {
+      status: error.status,
+      headers: {
+        ...headers,
+        [REQUEST_ID_HEADER]: id,
+        "Cache-Control": PRIVATE_CACHE,
+      },
+    },
   );
 }

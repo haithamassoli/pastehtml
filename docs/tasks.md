@@ -862,50 +862,85 @@ Allow authenticated users to create scoped credentials for automation.
 
 ### API Key Backend
 
-- [ ] Implement cryptographically secure API-key generation
-- [ ] Define API-key prefix format
-- [ ] Hash API keys before persistence
-- [ ] Show raw key only once
-- [ ] Implement API-key lookup
-- [ ] Implement key verification
-- [ ] Implement scope verification
-- [ ] Implement expiration
-- [ ] Implement revocation
-- [ ] Implement `lastUsedAt`
-- [ ] Prevent revoked-key reuse
-- [ ] Prevent expired-key reuse
+Most of this landed in Milestone 10, because the REST API could not authenticate
+without it; verified here rather than rewritten.
+
+- [x] Implement cryptographically secure API-key generation — `randomString`
+      over `crypto.getRandomValues`, rejecting bytes past the last whole
+      multiple of the alphabet so the distribution is unbiased
+- [x] Define API-key prefix format — `ph_` + 40 characters; the first 6 of the
+      secret are stored as `keyPrefix`, enough to recognise a key in a list and
+      far too little to use
+- [x] Hash API keys before persistence — SHA-256 hex, the same treatment update
+      tokens get. A key is high-entropy random, so a plain digest is the right
+      primitive; PBKDF2 is for passwords, which are guessable
+- [x] Show raw key only once — returned by `apiKeys.create` and by nothing else;
+      `list`'s returns validator has no field it could be added to
+- [x] Implement API-key lookup — the `by_key_hash` index, so the raw key is
+      never needed to find its row
+- [x] Implement key verification — `verifyApiKey`, which refuses every failure
+      with one message: a caller learns their key does not work, never whether
+      it once existed
+- [x] Implement scope verification — `requireScope`, called inside Convex rather
+      than at the API edge, so a key cannot gain reach by taking another route in
+- [x] Implement expiration — optional `expiresAt`, checked in `verifyApiKey`
+- [x] Implement revocation — `apiKeys.revoke`, owner-only and idempotent; the
+      first timestamp stands, because that is when access actually stopped
+- [x] Implement `lastUsedAt` — `apiKeys.touch`. Verification happens in a query
+      and queries cannot write, so `lib/api.ts` issues this alongside the
+      rate-limit charge it already makes, in the same `Promise.all` — no extra
+      round-trip. The write is throttled to once a minute per key, which is
+      plenty for a displayed date and keeps a hot key off its own row
+- [x] Prevent revoked-key reuse — asserted through `apiKeys.revoke`, not a
+      hand-patched row, so the mutation and the check are tested together
+- [x] Prevent expired-key reuse — asserted with a clock moved past the expiry
 
 ### API Key UI
 
-- [ ] Create API Keys settings page
-- [ ] Add create-key dialog
-- [ ] Add name field
-- [ ] Add scope selection
-- [ ] Add optional expiration
-- [ ] Show raw secret once after creation
-- [ ] Add copy-key action
-- [ ] Add key list
-- [ ] Show key prefix
-- [ ] Show creation date
-- [ ] Show last-used date
-- [ ] Show expiration state
-- [ ] Add revoke action
+- [x] Create API Keys settings page — `/dashboard/settings/api-keys`, live on
+      `useQuery` and reached from the dashboard nav
+- [x] Add create-key dialog — an inline form instead, as on the folders page. A
+      modal would have had to hand the raw secret over on its way out; inline,
+      the secret simply appears above the list it just joined
+- [x] Add name field
+- [x] Add scope selection — native checkboxes over the `SCOPES` list `schema.ts`
+      already exports, so the page cannot drift from the backend
+- [x] Add optional expiration — `<input type="date">`, read as the end of the
+      chosen day in the browser's timezone, which is the one the person picking
+      the date is thinking in
+- [x] Show raw secret once after creation — in a dismissible block that says so
+- [x] Add copy-key action — the existing `components/copy-button.tsx`
+- [x] Add key list
+- [x] Show key prefix
+- [x] Show creation date
+- [x] Show last-used date — or "never used"
+- [x] Show expiration state — revoked / expired / expires / no expiry. `list`
+      returns the raw timestamps and the page compares them, because a
+      subscribed query that read the clock would go stale as it resolved
+- [x] Add revoke action — behind `confirm()`, like every other destructive
+      action in the app, and hidden once the key is already revoked
 
 ### Tests
 
-- [ ] Test valid key
-- [ ] Test invalid key
-- [ ] Test revoked key
-- [ ] Test expired key
-- [ ] Test scope restrictions
-- [ ] Test cross-user access prevention
+- [x] Test valid key — publishes as the key's owner, not anonymously
+- [x] Test invalid key — an unknown key is rejected, never downgraded to
+      anonymous
+- [x] Test revoked key
+- [x] Test expired key
+- [x] Test scope restrictions — read, write and delete, in both directions
+- [x] Test cross-user access prevention — another account's paste, and another
+      account's key in `apiKeys.revoke` and `apiKeys.list`
+- [x] Test `lastUsedAt` and that `list` never leaks the digest — not on the
+      original list, but they are the two things this milestone actually added
 
 ## Milestone Acceptance Criteria
 
-- [ ] Users can create and revoke API keys
-- [ ] Raw secrets are never persisted
-- [ ] API scopes are enforced
-- [ ] API key usage is visible in the dashboard
+- [x] Users can create and revoke API keys
+- [x] Raw secrets are never persisted — only a SHA-256, asserted against the
+      stored row and against the `list` payload
+- [x] API scopes are enforced
+- [x] API key usage is visible in the dashboard — prefix, scopes, created, last
+      used and expiry state, live
 
 ---
 
@@ -919,49 +954,87 @@ Provide lightweight paste analytics without slowing down public page delivery.
 
 ### Analytics Model
 
-- [ ] Finalize analytics fields
-- [ ] Decide analytics retention period
-- [ ] Decide whether approximate country is required
-- [ ] Decide whether referrer is required
-- [ ] Decide whether user-agent family is required
-- [ ] Avoid storing unnecessary personal data
+- [x] Finalize analytics fields — timestamp, referring host, approximate
+      country, coarse browser family. One row per view in `pasteViews`; the
+      lifetime total stays denormalized on `pastes.viewsCount`
+- [x] Decide analytics retention period — 90 days for the rows, forever for the
+      total. `analytics.RETENTION_MS`, swept daily by a cron, and the counter is
+      never rewound, so the headline number outlives the detail behind it
+- [x] Decide whether approximate country is required — yes, at country
+      granularity only. Vercel's edge already sets `x-vercel-ip-country`; reading
+      the header is what `@vercel/functions`' `geolocation()` does anyway, so a
+      dependency for it would buy nothing
+- [x] Decide whether referrer is required — yes, but the host alone. A full
+      Referer carries a path and a query string that can name the visitor or
+      what they searched for; `referrerHost` in `pastes.recordView` drops both
+- [x] Decide whether user-agent family is required — yes, as one of five
+      buckets. The raw string is a near-fingerprint, so it is read once at the
+      edge and never sent to Convex; the column is a `v.union` of literals so a
+      public mutation cannot widen it
+- [x] Avoid storing unnecessary personal data — nothing stored identifies a
+      visitor: no address, no full user-agent, no cookie, no session. The
+      address the country came from never leaves the edge
 
 ### Collection
 
-- [ ] Implement non-blocking view recording
-- [ ] Increment paste view count
-- [ ] Record timestamp
-- [ ] Record optional referrer
-- [ ] Record optional country
-- [ ] Record optional user-agent family
-- [ ] Add abuse filtering if required
-- [ ] Exclude internal preview requests if appropriate
-- [ ] Exclude known bots if product policy requires it
+- [x] Implement non-blocking view recording — already `after()`-based in the
+      wildcard route: the response is on the wire before the mutation is called
+- [x] Increment paste view count
+- [x] Record timestamp
+- [x] Record optional referrer — normalized to a host inside the mutation, not
+      at the caller, because `recordView` is public and the route is not the
+      only thing that can reach it
+- [x] Record optional country — clamped to a two-letter code, same reason
+- [x] Record optional user-agent family
+- [x] ~~Add abuse filtering if required~~ — not required. Per-visitor dedup would
+      mean deriving and storing a key from the address, which is exactly the
+      data this milestone decided not to keep; bot filtering is the filter
+- [x] Exclude internal preview requests if appropriate — already excluded
+      structurally: only the wildcard origin records views, and the dashboard
+      preview and `/p/[token]/raw` are on the app origin
+- [x] Exclude known bots if product policy requires it — a bot is traffic, not a
+      reader, so it moves neither the total nor the breakdown. Substring checks
+      on the user-agent, with `ua-parser-js` named as the upgrade path
 
 ### Aggregation
 
-- [ ] Implement total views
-- [ ] Implement recent views
-- [ ] Implement views by day
-- [ ] Implement top referrers if enabled
-- [ ] Implement country summary if enabled
-- [ ] Optimize high-traffic aggregation strategy
+- [x] Implement total views — off the counter, so it is exact whatever the
+      table holds
+- [x] Implement recent views — last 24 hours and last 7 days
+- [x] Implement views by day — 30 UTC days, zero-filled so the chart has no gaps
+- [x] Implement top referrers if enabled
+- [x] Implement country summary if enabled — and browsers, which is the same
+      three lines
+- [x] Optimize high-traffic aggregation strategy — bounded and indexed: one
+      `by_paste_and_timestamp` range capped at 2000 rows, bucketed in JS. Past
+      that a paste's breakdown is flagged `truncated` while the total stays
+      exact; `@convex-dev/aggregate` is the noted upgrade
 
 ### UI
 
-- [ ] Add analytics summary to paste details
-- [ ] Add view-count card
-- [ ] Add recent activity visualization if needed
-- [ ] Add referrer table if enabled
-- [ ] Add country table if enabled
-- [ ] Add realtime total view count
+- [x] Add analytics summary to paste details — `analytics.tsx` beside the page,
+      owner-authorized in Convex like everything else on it
+- [x] Add view-count card — the section owns the total now, so `getOwned` no
+      longer has to render it twice
+- [x] Add recent activity visualization if needed — one CSS bar per day. A chart
+      library for thirty numbers would outweigh the rest of the page
+- [x] Add referrer table if enabled
+- [x] Add country table if enabled
+- [x] Add realtime total view count — `useQuery`, so a hit on the wildcard origin
+      repaints the open page
 
 ## Milestone Acceptance Criteria
 
-- [ ] Public paste serving does not wait on analytics writes
-- [ ] View totals update correctly
-- [ ] Analytics UI is available to authorized owners
-- [ ] Analytics collection follows the chosen privacy policy
+- [x] Public paste serving does not wait on analytics writes — `after()`, and
+      `route.test.ts` asserts the mutation has not been called when the response
+      is returned
+- [x] View totals update correctly
+- [x] Analytics UI is available to authorized owners — and only to them: a
+      stranger, a signed-out caller and an anonymous paste all reject in
+      `convex/analytics.test.ts`
+- [x] Analytics collection follows the chosen privacy policy — the referrer is
+      reduced to a host, the country to two letters, the user-agent to a bucket,
+      and the rows expire
 
 ---
 
@@ -975,51 +1048,97 @@ Allow AI agents and MCP clients to publish and manage pastes using the current M
 
 ### MCP Foundation
 
-- [ ] Verify the current MCP specification before implementation
-- [ ] Install and configure the official MCP TypeScript SDK
-- [ ] Create `/mcp` route
-- [ ] Define MCP transport
-- [ ] Define authentication requirements
-- [ ] Implement MCP-compatible error handling
-- [ ] Add MCP request logging without leaking content or credentials
+- [x] Verify the current MCP specification before implementation — read from the
+      installed SDK (1.30.0) rather than from memory: latest protocol revision
+      `2025-11-25`, still-supported `2025-06-18` and `2025-03-26`, streamable
+      HTTP as the remote transport, `stdio`/SSE not applicable to a Vercel route
+- [x] Install and configure the official MCP TypeScript SDK — installed in
+      Milestone 0; configured here
+- [x] Create `/mcp` route — `app/mcp/route.ts`, `POST` only
+- [x] Define MCP transport — the SDK's own
+      `WebStandardStreamableHTTPServerTransport`, which speaks `Request`/
+      `Response` and so drops straight into a route handler. Stateless
+      (`sessionIdGenerator: undefined`) with `enableJsonResponse`, because a
+      serverless function holds nothing between requests: one server and one
+      transport per request, no session id, no `GET` SSE stream
+- [x] Define authentication requirements — see _Authentication_ below
+- [x] Implement MCP-compatible error handling — a failed tool answers
+      `isError: true` with `{"error":{"code","message"}}`, the same `ErrorCode`
+      set the REST API returns; protocol and rate-limit failures stay at the
+      HTTP layer, through the same `route()` wrapper
+- [x] Add MCP request logging without leaking content or credentials — tool name
+      and outcome only, through the existing redacting `logger`
 
 ### Tools
 
-- [ ] Implement `create_paste`
-- [ ] Implement `get_paste`
-- [ ] Implement `update_paste`
-- [ ] Implement `delete_paste`
-- [ ] Implement `list_pastes`
-- [ ] Define input schemas for each tool
-- [ ] Define output schemas for each tool
-- [ ] Reuse core paste domain functions
-- [ ] Reuse core authorization logic
+- [x] Implement `create_paste` — delegates to `publishHtml`
+- [x] Implement `get_paste` — owner view first, public view as the fallback
+- [x] Implement `update_paste` — HTML, metadata, or both in one call
+- [x] Implement `delete_paste` — `pastes.remove`
+- [x] Implement `list_pastes` — `pastes.listByOwner` now takes the same
+      `apiKey` argument as `pastes.getOwned` and requires `pastes:read`, so a
+      key lists its own account and a write-only key is refused
+      (`convex/apiKeys.test.ts`)
+- [x] Define input schemas for each tool
+- [x] Define output schemas for each tool — loose where a paste's owner-only
+      fields may or may not be present, so a conforming client never rejects its
+      own data
+- [x] Reuse core paste domain functions — `publishHtml`, `replaceHtml`,
+      `pasteUrls`, `convex/pastes.ts`; the MCP layer adds no paste logic
+- [x] Reuse core authorization logic — every tool forwards the credential and
+      lets Convex decide; ownership and scopes are never re-derived here
 
 ### Authentication
 
-- [ ] Decide launch MCP authorization model
-- [ ] Implement authorization flow
-- [ ] Support current MCP client registration requirements
-- [ ] Support current MCP metadata/discovery requirements
-- [ ] Add token validation
-- [ ] Add scope validation
-- [ ] Add token revocation strategy
+- [x] Decide launch MCP authorization model — **`Authorization: Bearer ph_…`
+      API keys**, the credential Milestone 11 already issues, whose scopes
+      Convex already enforces. It costs nothing to build, it is revocable per
+      key, and every production MCP client can send a static header. Anonymous
+      `create_paste` stays possible, matching the REST API
+- [x] Implement authorization flow — `credentialsFrom(request)` from
+      `lib/api.ts`, unchanged; anonymous pastes additionally accept their update
+      token as a tool argument, since an MCP client cannot set a per-call header
+- [ ] Support current MCP client registration requirements — **deferred**. OAuth
+      2.1 with dynamic client registration means running an authorization
+      server, and a static API key already authenticates every client we care
+      about. Revisit when a client that cannot send a header asks for it
+- [ ] Support current MCP metadata/discovery requirements — **deferred with the
+      line above**: `/.well-known/oauth-protected-resource` and the
+      `WWW-Authenticate` challenge only describe the OAuth model, and publishing
+      them while there is no authorization server would advertise a flow that
+      does not exist
+- [x] Add token validation — `convex/lib/apiKeys.ts` `verifyApiKey`, against the
+      stored SHA-256
+- [x] Add scope validation — `requireScope` inside Convex, so `/mcp` can never
+      grant more than the equivalent REST call
+- [x] Add token revocation strategy — the same keys page: revoke or expire, and
+      `verifyApiKey` refuses both on the next request
 
 ### Agent Experience
 
-- [ ] Return public URL directly from `create_paste`
-- [ ] Return raw URL directly from `create_paste`
-- [ ] Provide clear tool descriptions
-- [ ] Provide predictable machine-readable errors
-- [ ] Document MCP setup
-- [ ] Test with at least one production-grade MCP client
+- [x] Return public URL directly from `create_paste`
+- [x] Return raw URL directly from `create_paste`
+- [x] Provide clear tool descriptions — written for an agent deciding which tool
+      to call, with `readOnlyHint`/`destructiveHint` annotations
+- [x] Provide predictable machine-readable errors
+- [x] Document MCP setup — `docs/mcp.md`
+- [x] Test with at least one production-grade MCP client — driven live by the
+      official SDK's own `Client` over `StreamableHTTPClientTransport` against a
+      running server: it negotiated the protocol, listed all five tools, created
+      a paste whose public URL then served the HTML and whose raw URL answered
+      `text/plain`, read it back, renamed it, had a wrong update token refused
+      with `FORBIDDEN`, deleted it with the right one, and got a 404 after.
+      `app/mcp/route.test.ts` keeps the same ground covered unattended
 
 ## Milestone Acceptance Criteria
 
-- [ ] An MCP client can create a paste
-- [ ] The tool returns a working public URL
-- [ ] Authenticated MCP clients can manage authorized pastes
-- [ ] MCP follows the current specification at launch
+- [x] An MCP client can create a paste
+- [x] The tool returns a working public URL
+- [x] Authenticated MCP clients can manage authorized pastes — read, update,
+      delete and list, each with the credential's scope enforced inside Convex
+- [x] MCP follows the current specification at launch — protocol, transport and
+      framing come from the official SDK, so they track the spec revision the
+      SDK ships
 
 ---
 
@@ -1031,33 +1150,83 @@ Support user-selected subdomains such as `my-demo.pastehtml.assoli.site` in addi
 
 ## Tasks
 
-- [ ] Finalize whether custom subdomains are included in v1
-- [ ] Define minimum length
-- [ ] Define maximum length
-- [ ] Define valid character rules
-- [ ] Normalize to lowercase
-- [ ] Reject invalid DNS labels
-- [ ] Create reserved-subdomain list
-- [ ] Validate uniqueness
-- [ ] Implement custom-subdomain lookup
-- [ ] Implement custom-subdomain assignment
-- [ ] Implement custom-subdomain removal
-- [ ] Implement custom-subdomain change
-- [ ] Restrict custom-subdomain changes to authorized owners
-- [ ] Prevent race conditions when assigning subdomains
-- [ ] Add UI for custom subdomain selection
-- [ ] Add availability indicator
-- [ ] Add tests for reserved names
-- [ ] Add tests for duplicates
-- [ ] Add tests for invalid characters
-- [ ] Add tests for routing
+The name rules, the uniqueness check and the host routing all landed with the
+milestones that needed them — a `customSubdomain` column with no way to set it
+would have been dead weight. What was actually missing was the way in: an
+availability query and a UI. Those are what this milestone adds.
+
+- [x] Finalize whether custom subdomains are included in v1 — **yes**, they ship
+      in v1. The wildcard runtime already serves any single label, so a vanity
+      name costs a column and a lookup, not an architecture.
+- [x] Define minimum length — 3, `SUBDOMAIN_MIN_LENGTH` (Milestone 1)
+- [x] Define maximum length — 63, the DNS label ceiling (Milestone 1)
+- [x] Define valid character rules — lowercase letters, digits and interior
+      hyphens (Milestone 1)
+- [x] Normalize to lowercase — `validateCustomSubdomain` trims and lowercases
+      before anything else looks at the value (Milestone 1)
+- [x] Reject invalid DNS labels — one regex, and `lib/host.ts` applies the same
+      one when routing, so a name that cannot be stored also cannot be reached
+      (Milestone 1 / Milestone 4)
+- [x] Create reserved-subdomain list — `RESERVED_SUBDOMAINS`, read by both the
+      validator and `lib/host.ts`, which keeps serving those labels from the app
+      (Milestone 1 / Milestone 4)
+- [x] Validate uniqueness — `claimSubdomain`, one `by_custom_subdomain` lookup
+      (Milestone 1)
+- [x] Implement custom-subdomain lookup — `pastes.getByCustomSubdomain`, and
+      `resolveForRuntime` tries the subdomain index before the token index, so
+      one host lookup serves both kinds of name (Milestone 1 / Milestone 4)
+- [x] Implement custom-subdomain assignment — `pastes.create({ customSubdomain })`
+      and `pastes.update`, plus the REST API's `subdomain` field (Milestone 1 /
+      Milestone 10). This milestone adds the dashboard UI over them.
+- [x] Implement custom-subdomain removal — `pastes.update({ customSubdomain: null })`
+- [x] Implement custom-subdomain change — the same field on the same mutation. A
+      dedicated assign/change/remove mutation would be three names for one
+      `patch`, and three places for the uniqueness check to drift apart.
+- [x] Restrict custom-subdomain changes to authorized owners — `authorizePasteWrite`,
+      which resolves the caller from their own Clerk session, API key or update
+      token; no caller-supplied owner id exists to spoof. **Decision**: an
+      anonymous paste's update-token holder may claim a name too. The token is
+      that paste's only credential, anonymous publishing is the front door, and
+      gating vanity names behind a sign-up would be a product decision dressed
+      up as a security one. The squatting that allows is metered in Milestone 15,
+      noted at the call site.
+- [x] Prevent race conditions when assigning subdomains — nothing to build: a
+      Convex mutation is a single serializable transaction, so the availability
+      read and the write that follows it commit together, and OCC retries any
+      mutation whose reads a concurrent commit invalidated. Two callers racing
+      for one name cannot both see it free — the loser re-runs, reads the
+      winner's row and gets `CONFLICT`. The argument is written out over
+      `claimSubdomain`, because it only holds while that read stays inside the
+      mutation that writes.
+- [x] Add UI for custom subdomain selection — `custom-subdomain.tsx` on the paste
+      detail page: the current URL with a copy button, one form for both assign
+      and change, and a `confirm()`-guarded remove
+- [x] Add availability indicator — `pastes.checkSubdomain`, a live subscription
+      behind a 300ms `setTimeout` debounce. It _returns_ its rejection instead of
+      throwing, so a half-typed name shows a message rather than tripping the
+      dashboard error boundary, and it answers "available" for the asking
+      paste's own name. Advisory only — the mutation re-checks.
+- [x] Add tests for reserved names — `convex/lib/validation.test.ts` for the
+      list, `convex/pastes.test.ts` for the mutation and the indicator
+- [x] Add tests for duplicates — a second paste claiming a taken name, a paste
+      re-saving its own (a no-op, not a conflict), and the old name going free
+      again the moment a change commits
+- [x] Add tests for invalid characters — the DNS-label cases and both ends of the
+      length range in `convex/lib/validation.test.ts`
+- [x] Add tests for routing — `proxy.test.ts` rewrites `my-demo.<root>` to the
+      paste runtime (vanity names are hyphenated where generated tokens never
+      are), `lib/host.test.ts` covers the label rules under the production root,
+      and `pastes.test.ts` proves `resolveForRuntime` hands that label the right
+      paste
 
 ## Milestone Acceptance Criteria
 
-- [ ] Authorized users can assign an available custom subdomain
-- [ ] Reserved and invalid names are rejected
-- [ ] Custom subdomains route to the correct paste
-- [ ] Duplicate assignment is impossible
+- [x] Authorized users can assign an available custom subdomain — from the
+      dashboard, the REST API, or at publish time
+- [x] Reserved and invalid names are rejected — `VALIDATION` for a malformed
+      label, `CONFLICT` for a reserved or taken one
+- [x] Custom subdomains route to the correct paste
+- [x] Duplicate assignment is impossible — see the transaction argument above
 
 ---
 
@@ -1071,81 +1240,381 @@ Harden the product before migration and public launch.
 
 ### Cookie and Origin Security
 
-- [ ] Audit all cookies
-- [ ] Verify no auth cookie is available to wildcard paste origins
-- [ ] Audit SameSite settings
-- [ ] Audit Secure flags
-- [ ] Audit HttpOnly flags
-- [ ] Add Origin validation to sensitive endpoints
-- [ ] Add CSRF protection where necessary
+- [x] Audit all cookies — two families and nothing else. Clerk's session
+      cookies on the app host, which Clerk sets and scopes itself, and
+      `ph_unlock`, the single cookie this app writes
+      (`app/internal/paste/[subdomain]/route.ts`). No analytics cookie, no
+      preference cookie, nothing on a paste origin but the unlock session.
+- [x] Verify no auth cookie is available to wildcard paste origins — holds,
+      unchanged from Milestone 6 and still three layers deep: Clerk never runs
+      on a paste host, the rewrite rebuilds `Cookie` from scratch keeping only
+      `ph_unlock`, and `e2e/auth.spec.ts` reads `document.cookie` from inside a
+      paste while a real session is live.
+- [x] Audit SameSite settings — `ph_unlock` is `Lax`, and `Lax` is the correct
+      one rather than the weaker one: the unlock POST is same-origin, so
+      `Strict` would pass too, but it would then drop the cookie on the next
+      inbound link to the paste and re-challenge a visitor who had just
+      unlocked it.
+- [x] Audit Secure flags — `ph_unlock` carries `Secure` exactly when the request
+      arrived over HTTPS, so production is always secure and `http://…localhost`
+      still works in development.
+- [x] Audit HttpOnly flags — `ph_unlock` is `HttpOnly`, which matters more here
+      than usual: once a paste is unlocked its own scripts run on that same
+      origin, and this is what keeps the session out of their reach.
+- [x] Add Origin validation to sensitive endpoints — two now. `lib/api.ts`
+      refuses a cookie-only write carrying a foreign `Origin` (Milestone 10),
+      and the unlock POST now requires its own. A form POST is CORS-simple, so
+      without that check any page on the internet could submit password guesses
+      from its visitors' browsers and spread the per-address throttle across
+      every one of them. The check and the challenge page's own headers
+      interact: under `Referrer-Policy: no-referrer` Chrome sends
+      `Origin: null` for a form post, which named nobody and locked every real
+      visitor out — caught only in a browser, by `e2e/password.spec.ts`. The
+      challenge is `same-origin` now (it loads nothing, under
+      `default-src 'none'`, so the paste URL still never leaves), a literal
+      `null` origin stays refused, and two cases in the runtime route's suite
+      pin both halves so the header cannot be "hardened" back.
+- [x] Add CSRF protection where necessary — those two are all of it. Convex
+      authenticates with a bearer JWT rather than a cookie, and the app has no
+      Server Actions, so there is no third cookie-authenticated write to forge.
 
 ### XSS and HTML Isolation
 
-- [ ] Audit dashboard rendering of paste metadata
-- [ ] Escape user-controlled titles
-- [ ] Escape user-controlled filenames
-- [ ] Never inject raw paste HTML into privileged app DOM
-- [ ] Audit preview sandbox
-- [ ] Audit Content Security Policy
+An audit, not a build: React escapes its children, so the question is only
+whether any paste-controlled string escapes React. None does — `grep` finds no
+`dangerouslySetInnerHTML` and no `innerHTML` anywhere in `app/`.
+
+- [x] Audit dashboard rendering of paste metadata — title, filename, description
+      and custom subdomain each reach the DOM as a React child, on the dashboard
+      detail page, the folder and dashboard lists, and `/p/[token]`. The only
+      paste value that reaches an attribute is `customSubdomain`, and it is a
+      validated DNS label, so no `javascript:` URL can be built out of one.
+- [x] Escape user-controlled titles — nothing to add: `{displayName(paste)}` and
+      `{paste.title || paste.filename}` are children, and the copy of the title
+      that reaches `generateMetadata` is escaped by React on the way into `<title>`
+- [x] Escape user-controlled filenames — the same, plus the one place a filename
+      leaves the DOM: the raw endpoint percent-encodes it into `Content-Disposition`
+      in RFC 5987 form, which also neutralises quotes (`app/p/[token]/raw/route.test.ts`
+      asserts it on a filename containing them)
+- [x] Never inject raw paste HTML into privileged app DOM — the app origin has
+      exactly two routes to stored bytes and neither parses them as app-origin
+      markup: `/p/[token]/raw` serves `text/plain` + `nosniff`, and
+      `/p/[token]/render` serves them under a CSP `sandbox` without
+      `allow-same-origin`. Proven in `e2e/preview.spec.ts`, which reads
+      `document.contentType` on one and `window.origin === "null"` on the other.
+- [x] Audit preview sandbox — the fence is stated twice and holds at both: the
+      render response carries a CSP `sandbox` directive, and the dashboard
+      `<iframe>` that embeds it carries a `sandbox` attribute. Neither grants
+      `allow-same-origin`, which is the whole sandbox.
+- [x] Audit Content Security Policy — two exist and both are correct: the render
+      sandbox above, and the unlock challenge's `default-src 'none'` policy,
+      which pins `form-action` to `'self'` and renders nothing user-controlled.
+      The wildcard runtime deliberately sets none — a published page is meant to
+      run its own scripts, and its isolation is the separate origin. The app
+      origin's own header is the Headers subsection's box.
 
 ### Rate Limiting
 
-- [ ] Rate limit anonymous paste creation
-- [ ] Rate limit password attempts
-- [ ] Rate limit API-key requests
-- [ ] Rate limit MCP requests
-- [ ] Rate limit paste updates
-- [ ] Rate limit destructive operations
-- [ ] Define rate-limit response format
+The audit's finding, which shapes the rest: **an identifier the edge supplies
+is not a security boundary.** Milestone 10's limiter keys on the caller's
+address and Milestone 9's on a `client` argument, and both are reachable around
+— `NEXT_PUBLIC_CONVEX_URL` is in the browser bundle, so anyone can call the
+public Convex mutations directly and label themselves however they like. Every
+limit below is therefore charged inside Convex, by `enforce` in
+`convex/rateLimit.ts`, and the edge limiter is kept for what it is good at:
+answering with `RateLimit-*` headers before any work happens.
+
+- [x] Rate limit anonymous paste creation — the hole `convex/rateLimit.ts`
+      admitted in its own header comment. The browser publishes by calling
+      `pastes.create` directly (`lib/upload.ts`), so the REST limiter never saw
+      the front door; `create` now charges `paste:create` itself. A signed-in
+      author is charged to their account. **Anonymous authors share one global
+      bucket** — a Convex mutation cannot see a client address and a
+      caller-supplied one would be a lie — which makes it a burn-rate ceiling
+      rather than a fairness mechanism, and a denial-of-service surface in its
+      own right. Hence the 10-second window: 30 per 10s holds the same sustained
+      ceiling a per-minute limit would while capping an outage at ten seconds.
+      Recorded in the module's `ponytail:` note along with the OCC contention
+      that one shared row implies.
+- [x] Rate limit password attempts — Milestone 9 said this was done. It was not:
+      `unlock` is public and its `client` argument is caller-supplied, so a
+      guesser mints a fresh identifier per attempt and the per-(paste, client)
+      cap never trips. Fixed with a second cap that does not read `client` at
+      all — 100 failures per paste per 15 minutes, in the same `unlockAttempts`
+      table under a sentinel row. The per-client cap stays and stays first, so
+      an honest visitor still has a budget of their own instead of a share of
+      one an attacker is draining. The trade-off is stated where the constants
+      are: a paste under attack is shut to everyone, correct password included,
+      for the rest of the window. `unlockAttempts` also gained the hourly sweep
+      it never had, because a fresh `client` per guess is a fresh row.
+- [x] Rate limit API-key requests — verified, not rebuilt: `lib/api.ts` charges
+      `api:read` / `api:write` per key prefix before the handler runs, 240 and
+      60 a minute. Underneath it the paste buckets now apply to a key like any
+      other caller.
+- [x] Rate limit MCP requests — verified: `app/mcp/route.ts`'s `POST` is the
+      same `route()` wrapper at `api:write`, so one JSON-RPC request is one
+      charge, and the tools land on the same in-Convex buckets underneath.
+      Nothing to add.
+- [x] Rate limit paste updates — `update` and `replaceContent` charge
+      `paste:write`, keyed to the owning account or, for an anonymous paste, to
+      the paste itself. Per-paste rather than global, so no shared chokepoint.
+- [x] Rate limit destructive operations — the same bucket on `remove`,
+      `setPassword` and `removePassword`; the last two are destructive in the
+      sense that matters, since either revokes every outstanding unlock session.
+- [x] Define rate-limit response format — unchanged at the edge: `429` with
+      `{ error: { code: "RATE_LIMITED" } }` and `RateLimit-Limit` /
+      `-Remaining` / `-Reset`. An in-Convex refusal raises the same
+      `RATE_LIMITED` code, which `toAppError` maps onto the same envelope, but
+      carries no `RateLimit-*` headers — the budget it spent is neither
+      per-request nor per-caller, so there is no honest number to report.
+
+Two public mutations are deliberately left uncharged, and both are named here
+rather than quietly skipped. `pastes.recordView` is unmetered because a cap on
+it would drop the views of a paste that got popular, which is a product
+regression to fix an inflated number; retention already bounds the table.
+`storage.generateUploadUrl` is unmetered because the hourly orphan sweep bounds
+what an unreferenced upload can cost to an hour of storage — charge it the day
+that stops being true, in a bucket of its own so it does not spend the
+creation budget twice.
 
 ### Abuse Controls
 
-- [ ] Add paste-disable internal function
-- [ ] Add paste-delete administrative function
-- [ ] Add simple internal moderation workflow
-- [ ] Add abuse-report intake mechanism
-- [ ] Add operational metadata required for abuse investigation
-- [ ] Avoid unnecessary sensitive-data retention
-- [ ] Add configurable blocked identifiers if needed
+All of it lives in `convex/admin.ts`, and the shape of that file is the
+trade-off worth recording: **the moderation workflow is `npx convex run`.** A
+one-person product has exactly one moderator, and a console for them would be a
+login page, an admin role and a permission model to get wrong — three new ways
+to lose control of the takedown button, to save typing a command. The file's
+header carries the six invocations. Give it a UI the day a second person
+moderates.
+
+- [x] Add paste-disable internal function — `admin.disable` / `admin.enable`,
+      setting `disabledAt` + `disabledReason` on the paste. This is the answer
+      Milestone 4 anticipated and left open: `resolveForRuntime` now withholds
+      the storage URL for a disabled paste exactly as it does for a locked one,
+      so the wildcard runtime answers `410 Gone` and the raw and preview
+      endpoints stop with it — one flag, every surface, no serving-layer change.
+      Disabled beats locked, so a takedown cannot be opened with the password
+      its author set.
+- [x] Add paste-delete administrative function — `admin.purge`, by token, no
+      caller authorization. It reuses `pastes.hardDelete`, so the row and the
+      stored bytes go together. `disable` is the one to reach for first: it is
+      reversible and it keeps the evidence.
+- [x] Add simple internal moderation workflow — `admin:pending` for the queue,
+      `admin:inspect` to look, `admin:disable` / `admin:purge` to act,
+      `admin:resolve` to close. Five commands, no UI, per the trade-off above.
+- [x] Add abuse-report intake mechanism — `POST /api/v1/abuse`, unauthenticated,
+      writing to `abuseReports`. A sign-up wall in front of a report means never
+      hearing about the phishing page. Throttled twice: per address by the REST
+      limiter, and per _reported paste_ in Convex, so one target cannot be
+      report-bombed into an unreadable queue.
+- [x] Add operational metadata required for abuse investigation — `admin.inspect`
+      returns what a decision actually needs: owner (Clerk's `tokenIdentifier`,
+      which is what Clerk's own dashboard looks an account up by) or its absence,
+      timestamps, size, content type, the stored SHA-256 — which identifies the
+      exact bytes, so the same payload is recognisable across pastes without
+      keeping a copy — view count, and the paste's report history.
+- [x] Avoid unnecessary sensitive-data retention — audited and it already holds,
+      and the new code keeps it: no publisher address is stored anywhere, so
+      there is none for `inspect` to return; `pasteViews` keeps a country, a
+      referring host and a browser bucket and no visitor; `lib/logger.ts`
+      redacts anything token-shaped. `abuseReports` deliberately records nothing
+      about the reporter — a contact address a one-person product cannot act on
+      is personal data with only a downside.
+- [x] ~~Add configurable blocked identifiers if needed~~ — not needed, and the
+      configurable list that matters already exists: `RESERVED_SUBDOMAINS` in
+      `convex/lib/validation.ts` is one array in one place, and adding a
+      phishing-bait label to it is a one-line change. Blocking a _publisher_
+      would need a repeat abuser to exist first; until one does, `admin.disable`
+      and `admin.purge` are the whole response and a block list is a table to
+      maintain for nobody.
+
+**API-key scopes, folded in here because it is the same question** — who may do
+what: `folders:read` and `folders:write` were grantable and enforced nowhere.
+`convex/folders.ts` took no `apiKey` at all, so no key could reach folder CRUD,
+while the one folder operation a key _could_ reach — `pastes.update({ folderId })`
+— was gated on `pastes:write`. A key deliberately scoped to pastes could refile
+its owner's pastes. Implemented rather than dropped: folders are a real feature
+and MCP already advertises `folderId` to key holders, so two dead scopes were
+the bug, not two scopes too many. `apiKey` is threaded through the folder
+functions with the matching `requireScope`, and both `pastes.create` and
+`pastes.update` now require `folders:write` when folder membership is what they
+are editing.
 
 ### Headers
 
-- [ ] Configure dashboard CSP
-- [ ] Configure `X-Content-Type-Options`
-- [ ] Configure referrer policy
-- [ ] Configure frame policy where relevant
-- [ ] Configure permissions policy
-- [ ] Audit CORS behavior
-- [ ] Audit cache headers on private content
+Every rule in `next.config.ts` is scoped with `has: [{ type: "host" }]`, and
+that scoping is the whole exercise. Proxy rewrites a paste origin to the runtime
+_after_ header rules match, so a path-only rule would match `/` on a paste host
+too — and a published page is meant to be embeddable and to run its own
+scripts, so a frame or CSP rule reaching one would break the product. Verified
+against a running build: the app host gets all five headers, a paste host gets
+only the runtime's own three, and `/p/[token]/render` keeps its `sandbox` CSP
+with nothing appended to it.
+
+- [x] Configure dashboard CSP — `base-uri 'self'`, `object-src 'none'`,
+      `frame-ancestors 'self'` and `form-action 'self'`, on the app's own pages
+      only, listed one by one so it can never reach `/p/[token]/render` and
+      end up as a second CSP header beside its sandbox. Deliberately **no
+      `script-src`**: locking scripts down needs a per-request nonce threaded
+      through Proxy into Next's and Clerk's inline bootstrap, which also makes
+      every page dynamic — a real cost for a policy that is depth here, not the
+      primary defence, since uploaded HTML never enters this DOM at all. What is
+      left closes what React's escaping does not: a stolen `<base>`, a plugin
+      object, a form posting credentials elsewhere, and being framed.
+- [x] Configure `X-Content-Type-Options` — `nosniff` on every app-host response.
+      The raw endpoint already set it per-response and still does; this is the
+      same guarantee for everything else the app serves.
+- [x] Configure referrer policy — `strict-origin-when-cross-origin` on the app
+      host. Paste responses keep the stricter `no-referrer` they already set,
+      since a paste path can name what someone published.
+- [x] Configure frame policy where relevant — `X-Frame-Options: SAMEORIGIN` plus
+      `frame-ancestors 'self'`. `SAMEORIGIN` rather than `DENY` because the
+      dashboard previews a paste in a same-origin iframe. The wildcard runtime
+      is untouched and stays framable by anyone, which is the point of it.
+- [x] Configure permissions policy — `camera`, `microphone`, `geolocation` and
+      `payment` all denied on the app host. A published page keeps every
+      capability it wants, because the policy never reaches its origin.
+- [x] Audit CORS behavior — no `Access-Control-Allow-Origin` anywhere, and that
+      is the finding: the REST API and `/mcp` are for scripts, CLIs and agents,
+      none of which are subject to CORS, so cross-origin browser JS cannot read
+      a response and nothing needs it to. Adding `*` would only widen what a
+      hostile page can do with a visitor's ambient credentials.
+- [x] Audit cache headers on private content — the dashboard was already correct
+      and needed nothing: every route under it reads `auth()`, so Next marks it
+      `private, no-cache, no-store, max-age=0, must-revalidate` (confirmed with
+      `curl` against a production build). The API did need a line: a `GET` on a
+      paste returns the owner view or the public view for the same URL depending
+      on who asks, so `lib/api.ts` now states `private, no-store` on every
+      response it builds rather than leaving that to a default.
 
 ### Secrets
 
-- [ ] Audit Vercel environment secrets
-- [ ] Audit Convex environment secrets
-- [ ] Verify no secret is exposed with `NEXT_PUBLIC_`
-- [ ] Add secret rotation procedure
-- [ ] Ensure logs redact credentials
+- [x] Audit Vercel environment secrets — one secret, `CLERK_SECRET_KEY`. The
+      other four variables are `NEXT_PUBLIC_*` and public by definition: the app
+      URL, the Convex deployment URL, the Clerk publishable key and the sign-in
+      paths.
+- [x] Audit Convex environment secrets — one, `CLERK_JWT_ISSUER_DOMAIN`, and it
+      is not even secret — it is the public issuer URL Convex fetches a JWKS
+      from. It lives on the deployment rather than in `.env.local` because
+      `convex/auth.config.ts` runs in Convex, not in Next.
+- [x] Verify no secret is exposed with `NEXT_PUBLIC_` — holds. `lib/env.ts` is
+      the only module that reads `process.env` in application code, every
+      `NEXT_PUBLIC_` name in it is public by design, and `CLERK_SECRET_KEY` is
+      read only from `serverEnv()`, a function no client module imports.
+- [x] Add secret rotation procedure — below. Two secrets, so it is two
+      procedures, and Milestone 18 folds them into the operations runbook.
+- [x] Ensure logs redact credentials — already true and re-checked:
+      `lib/logger.ts` replaces any field whose name matches
+      `password|token|secret|apikey|api_key|authorization|cookie`, recursively,
+      and `lib/api.ts` logs an operation and a status code but never a body.
+      The one credential-adjacent value that reaches a log line deliberately is
+      the first nine characters of an API key, used as a rate-limit bucket name;
+      that prefix is stored in `apiKeys.keyPrefix` on purpose and is not enough
+      to authenticate with.
+
+**Rotation.** Neither secret is stored anywhere but its own provider, so
+rotation is: mint the new one, set it, redeploy, revoke the old one — in that
+order, so there is no window with no valid credential.
+
+- `CLERK_SECRET_KEY` — Clerk dashboard → API keys → create a new secret key;
+  `vercel env rm CLERK_SECRET_KEY production` then `vercel env add`, or the
+  dashboard; redeploy (a secret is read at runtime, but the deploy is what picks
+  up the new environment); confirm a sign-in works; delete the old key in Clerk.
+  Sessions survive — the key signs API calls, not the session cookie.
+- `CLERK_JWT_ISSUER_DOMAIN` — not a rotation but a re-point, and the one that
+  needs care: `npx convex env set CLERK_JWT_ISSUER_DOMAIN <new issuer>` takes
+  effect on the next request, and every JWT from the old issuer stops verifying
+  at that moment. Do it with the Clerk instance switch, not before it.
+- Convex deploy key — `npx convex dashboard` → Settings → Deploy keys → revoke
+  and regenerate, then update `CONVEX_DEPLOY_KEY` in Vercel. Nothing in the app
+  reads it; only builds do.
+- An anonymous paste's update token cannot be rotated by design — it is issued
+  once and never redisplayed. The recovery is to claim the paste into an
+  account, which retires the token.
 
 ### Security Testing
 
-- [ ] Test subdomain cookie isolation
-- [ ] Test CSRF defenses
-- [ ] Test IDOR scenarios
-- [ ] Test cross-user paste access
-- [ ] Test cross-user folder access
-- [ ] Test API-key scope bypass attempts
-- [ ] Test anonymous update-token guessing resistance
-- [ ] Test password brute-force controls
-- [ ] Test hostile HTML payloads
-- [ ] Test malformed host headers
+Most of this was already tested where the rule lives, milestone by milestone.
+What this pass adds is `convex/security.test.ts` for the cases that span two
+functions or two credentials, and `e2e/security.spec.ts` for a paste that goes
+looking rather than an app that says it is safe.
+
+- [x] Test subdomain cookie isolation — already covered by `e2e/auth.spec.ts`
+      (a real Clerk session, no leading-dot `Domain`, empty `document.cookie`
+      inside a paste) and `proxy.test.ts` (the `Cookie` header rebuilt from
+      scratch). `e2e/security.spec.ts` adds the active version: a paste that
+      reads for the cookie, frames the dashboard, and writes to its own
+      `localStorage` to prove the app origin never sees it.
+- [x] Test CSRF defenses — already covered by `e2e/api.spec.ts` over real HTTP.
+      `lib/api.test.ts` adds the case this product specifically has to get
+      right: a cookie-only write from a **wildcard paste origin**, which a
+      suffix match on the host would have let through.
+- [x] Test IDOR scenarios — `convex/security.test.ts` walks every owner-only
+      entry point with the wrong account and asserts the code _and_ that the
+      rejection carries nothing but `{ code, message }`: no owner identity, no
+      title, no document id.
+- [x] Test cross-user paste access — the read/update/delete cases are in
+      `convex/pastes.test.ts` and `convex/apiKeys.test.ts`; `security.test.ts`
+      adds content replacement, both password mutations and analytics.
+- [x] Test cross-user folder access — already covered by `convex/folders.test.ts`
+      (get, rename, remove, assignment, and `listByFolder`, which answers
+      `NOT_FOUND` because the folder is what the caller does not own)
+- [x] Test API-key scope bypass attempts — `security.test.ts` takes a
+      delete-only key to every other function on a paste and gets `FORBIDDEN`
+      from each, because the scope is checked inside the function rather than at
+      the surface that called it. **Finding, since fixed**: `folders:read` and
+      `folders:write` were grantable but checked nowhere — `convex/folders.ts`
+      took no `apiKey` at all, and the one folder operation a key can reach,
+      `pastes.update({ folderId })`, was gated on `pastes:write` alone. The
+      folder functions now take a key and check the scope, refiling a paste
+      costs `folders:write`, and the case is live rather than skipped.
+- [x] Test anonymous update-token guessing resistance — `security.test.ts`: a
+      truncated token, a one-character miss, a lengthened one, another paste's
+      _live_ token, and an owned paste that no token manages at all
+- [x] Test password brute-force controls — the cap, its per-client scope, its
+      reset and the no-free-guess rule are covered by `convex/password.test.ts`
+      and still hold. **Finding, since fixed**: `pastes.unlock` is a public
+      Convex mutation and `client` is just an argument, so a caller who skipped
+      our runtime picked a fresh identifier per guess and never met the cap — no
+      address pool needed. A second cap now counts every failure against the
+      paste itself, whatever the caller calls itself, and `unlockAttempts` has
+      the sweep it was missing. The rotating-identifier case in
+      `security.test.ts` is live rather than skipped.
+- [x] Test hostile HTML payloads — `e2e/security.spec.ts` publishes a page that
+      tries the app's cookies, `document.domain`, a framed dashboard, a
+      `postMessage` at it, and `fetch` at `/api/v1` with ambient credentials,
+      and asserts each comes back empty. A second test proves the paste origin
+      routes no app path at all, so there is no origin where ambient credentials
+      and a privileged endpoint could meet.
+- [x] Test malformed host headers — `proxy.test.ts`: an IPv6 literal, an
+      over-long label, embedded whitespace and tabs, plain and percent-encoded
+      path traversal, an empty label, a root dot behind a port, and an absent
+      `Host`. None produces a rewrite. The label rules themselves stay in
+      `lib/host.test.ts`. A CRLF is not testable and does not need to be — the
+      runtime refuses to build the header value at all.
 
 ## Milestone Acceptance Criteria
 
-- [ ] Critical security review findings are resolved
-- [ ] Auth cookies remain isolated from wildcard content
-- [ ] Sensitive operations have rate limits
-- [ ] Privileged application pages never execute uploaded HTML
-- [ ] Abuse controls exist for administrators
+- [x] Critical security review findings are resolved — three were found and all
+      three are closed: the password throttle could be walked past by inventing
+      a `client` per guess, anonymous publishing had no limit at all because the
+      browser calls Convex directly, and two API-key scopes were grantable but
+      checked nowhere. The pattern behind all three is one line long — an
+      identifier or a check that lives at the edge is not a boundary — and every
+      fix moved the enforcement into Convex.
+- [x] Auth cookies remain isolated from wildcard content — re-audited, unchanged
+      since Milestone 6, and now also true of the headers: every rule in
+      `next.config.ts` is scoped to the app host, so nothing this milestone
+      added reaches a paste origin.
+- [x] Sensitive operations have rate limits — creation, updates, content
+      replacement, deletion, password changes, unlock attempts and abuse
+      reports, all charged inside Convex where no surface can skip them.
+- [x] Privileged application pages never execute uploaded HTML — the other
+      half's audit, and it holds: `text/plain` + `nosniff` on the raw endpoint,
+      a `sandbox` CSP without `allow-same-origin` on the preview.
+- [x] Abuse controls exist for administrators — disable, re-enable, purge,
+      inspect, and a report queue, all through `npx convex run`. The deliberate
+      absence is a moderation UI; see the Abuse Controls note for why.
 
 ---
 
@@ -1650,11 +2119,15 @@ The rebuild is considered complete when all launch-critical milestones are compl
 - [ ] Preview routes work
 - [x] Folder management works
 - [x] Password protection works
-- [ ] API keys work
+- [x] API keys work — scoped, hashed, revocable, with `lastUsedAt` and the
+      settings UI (Milestone 11)
 - [x] REST API publishing works
-- [ ] MCP publishing works
-- [ ] Analytics works without blocking public responses
-- [ ] Security isolation between app and paste origins is verified
+- [x] MCP publishing works — verified live with the official SDK client
+      (Milestone 13)
+- [x] Analytics works without blocking public responses — recorded in
+      `after()`, after the HTML is already on the wire (Milestone 12)
+- [x] Security isolation between app and paste origins is verified — audited
+      and attacked from inside a published page (Milestone 15)
 - [ ] Migration has preserved required existing paste URLs
 - [ ] Automated critical-path tests pass
 - [ ] Production monitoring is enabled

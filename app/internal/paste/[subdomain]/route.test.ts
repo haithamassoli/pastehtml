@@ -79,15 +79,30 @@ describe("paste runtime", () => {
   });
 
   it("defers the view recording so it cannot block delivery", async () => {
-    await get();
+    await get({
+      referer: "https://news.example.com/thread?user=ada",
+      "x-vercel-ip-country": "PT",
+      "user-agent":
+        "Mozilla/5.0 (Macintosh) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36",
+    });
 
     expect(after).toHaveBeenCalledOnce();
     expect(mutation).not.toHaveBeenCalled();
     after.mock.calls[0][0]();
     expect(mutation).toHaveBeenCalledWith(expect.anything(), {
       token: "abc123def456",
-      referrer: undefined,
+      referrer: "https://news.example.com/thread?user=ada",
+      country: "PT",
+      // A bucket, never the string it came from.
+      userAgentFamily: "chrome",
     });
+  });
+
+  it("serves a bot without counting it as a view", async () => {
+    const response = await get({ "user-agent": "Googlebot/2.1" });
+
+    expect(response.status).toBe(200);
+    expect(after).not.toHaveBeenCalled();
   });
 
   it("answers a conditional request with 304 and no body", async () => {
@@ -213,6 +228,37 @@ describe("unlock", () => {
     expect(response.status).toBe(401);
     expect(response.headers.get("Set-Cookie")).toBeNull();
     expect(await response.text()).toContain("Incorrect password.");
+  });
+
+  it("accepts its own challenge page's origin and refuses any other", async () => {
+    mutation.mockResolvedValue({
+      ok: true,
+      unlockToken: "granted",
+      expiresAt: Date.now() + 60_000,
+    });
+
+    const ours = await post("correct horse", {
+      origin: "http://abc123def456.localhost",
+    });
+    expect(ours.status).toBe(303);
+
+    // `null` is what a sandboxed or `no-referrer` page sends. It names nobody,
+    // so it is refused — which is also why the challenge page must not carry
+    // `Referrer-Policy: no-referrer`: Chrome would then send `null` for our own
+    // form and lock every visitor out. The header below is the guard on that.
+    for (const origin of ["null", "http://evil.example"]) {
+      const theirs = await post("correct horse", { origin });
+      expect(theirs.status, origin).toBe(401);
+      expect(theirs.headers.get("Set-Cookie"), origin).toBeNull();
+    }
+  });
+
+  it("does not let the challenge page suppress its own Origin", async () => {
+    mutation.mockResolvedValue({ ok: false, reason: "invalid" });
+
+    const response = await post("wrong");
+
+    expect(response.headers.get("Referrer-Policy")).not.toBe("no-referrer");
   });
 
   it("answers a throttled attempt with 429", async () => {

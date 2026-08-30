@@ -8,6 +8,8 @@
  * @module
  */
 
+import type * as admin from "../admin.js";
+import type * as analytics from "../analytics.js";
 import type * as apiKeys from "../apiKeys.js";
 import type * as crons from "../crons.js";
 import type * as folders from "../folders.js";
@@ -27,6 +29,8 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  admin: typeof admin;
+  analytics: typeof analytics;
   apiKeys: typeof apiKeys;
   crons: typeof crons;
   folders: typeof folders;

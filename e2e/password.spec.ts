@@ -11,9 +11,19 @@ import { expect, test, type Page } from "@playwright/test";
 const USER = process.env.E2E_CLERK_USER_EMAIL ?? "e2e+clerk_test@example.com";
 const PASSWORD = "correct horse battery";
 
-/** Publishes from the home page and returns the new paste's token. */
-async function publish(page: Page, html: string): Promise<string> {
+/**
+ * Publishes from the home page and returns the new paste's token. When signed
+ * in, waits for Convex to hold the Clerk token first: uploading before it does
+ * creates the paste as anonymous, and this spec protects what it publishes.
+ */
+async function publish(
+  page: Page,
+  html: string,
+  owned = false,
+): Promise<string> {
   await page.goto("/");
+  if (owned)
+    await expect(page.getByText("Publishing to your account")).toBeVisible();
   await page.setInputFiles('input[type="file"]', {
     name: "protected.html",
     mimeType: "text/html",
@@ -51,7 +61,7 @@ const publicUrl = (token: string) => `http://${token}.localhost:3000/`;
 test("protects, unlocks and unprotects a paste", async ({ page, context }) => {
   const token = await publishOwned(page, "<h1>secret contents</h1>");
   // Signed in from here on, so this one is owned the moment it is published.
-  const other = await publish(page, "<h1>other secret</h1>");
+  const other = await publish(page, "<h1>other secret</h1>", true);
 
   for (const each of [token, other]) await protect(page, each);
 

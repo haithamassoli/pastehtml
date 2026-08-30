@@ -184,6 +184,19 @@ with — and every one of them is verified inside Convex, never at the edge.
 See `docs/api.md` for the full reference: request shapes, error codes and rate
 limits.
 
+## MCP
+
+`POST /mcp` exposes the same operations to AI agents over the Model Context
+Protocol — `create_paste`, `get_paste`, `update_paste`, `delete_paste`,
+`list_pastes` — authenticated with the same `ph_…` API keys, whose scopes Convex
+enforces. Anonymous publishing works there too.
+
+```bash
+claude mcp add --transport http pastehtml http://localhost:3000/mcp
+```
+
+See `docs/mcp.md` for the tool reference and authenticated setup.
+
 ## Testing
 
 `npm run test` runs the Vitest suites (Convex functions under `convex-test`,
@@ -206,6 +219,7 @@ protection) from the keys in `.env.local`. Override the fixture address with
 - `app/(marketing)` — public pages (home / publishing).
 - `app/(dashboard)` — authenticated management UI.
 - `app/api` — REST API (versioned under `v1`).
+- `app/mcp` — MCP server for agents, over the same domain functions.
 - `convex/` — backend: schema, queries, mutations, file storage.
 - `lib/` — `env`, `config`, `errors`, `logger`, `request-id` shared modules.
 - `proxy.ts` — host routing (wildcard paste origins) + Clerk on app hosts.
@@ -213,4 +227,5 @@ protection) from the keys in `.env.local`. Override the fixture address with
   the rewrite in `proxy.ts`, never directly.
 
 See `docs/conventions.md` for naming and error-code conventions, `docs/api.md`
-for the REST API reference, and `docs/tasks.md` for the milestone plan.
+for the REST API reference, `docs/mcp.md` for the MCP server, and
+`docs/tasks.md` for the milestone plan.

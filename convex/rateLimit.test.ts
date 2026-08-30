@@ -3,6 +3,12 @@ import { convexTest } from "convex-test";
 import { describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
+import {
+  MAX_UNLOCK_ATTEMPTS,
+  MAX_UNLOCK_ATTEMPTS_PER_PASTE,
+  UNLOCK_WINDOW_MS,
+} from "./pastes";
+import { codeOf, createPaste, users } from "../test/convex-helpers";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -81,5 +87,141 @@ describe("rateLimit.consume", () => {
     expect(
       await t.run((ctx) => ctx.db.query("rateLimits").collect()),
     ).toHaveLength(0);
+  });
+});
+
+// The layer that matters: `enforce`, charged inside the mutations themselves.
+// The browser calls `pastes.create` directly, so nothing an edge limiter does
+// covers publishing — these are the limits that cannot be routed around.
+describe("rateLimit.enforce", () => {
+  const CREATE_LIMIT = 30;
+
+  it("caps anonymous creation on one shared budget", async () => {
+    const t = convexTest(schema, modules);
+    for (let i = 0; i < CREATE_LIMIT; i++) await createPaste(t);
+
+    expect(await codeOf(createPaste(t))).toBe("RATE_LIMITED");
+    // A rejection rolls its own increment back, but the window stays spent —
+    // the counter reached the limit through creates that committed.
+    expect(await codeOf(createPaste(t))).toBe("RATE_LIMITED");
+
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(Date.now() + 11_000);
+      await createPaste(t);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("charges an account to itself, not to the anonymous pool", async () => {
+    const t = convexTest(schema, modules);
+    const { alice } = users(t);
+    for (let i = 0; i < CREATE_LIMIT; i++) await createPaste(t);
+
+    // Anonymous publishing is a global bucket, so it is a denial-of-service
+    // surface. A signed-in author must not be caught by someone else's flood.
+    expect(await codeOf(createPaste(t))).toBe("RATE_LIMITED");
+    await createPaste(alice);
+  });
+
+  it("charges writes to the paste being written, not globally", async () => {
+    const t = convexTest(schema, modules);
+    const first = await createPaste(t);
+    const second = await createPaste(t);
+    const patch = (
+      paste: { token: string; updateToken?: string },
+      title: string,
+    ) =>
+      t.mutation(api.pastes.update, {
+        token: paste.token,
+        updateToken: paste.updateToken,
+        title,
+      });
+
+    for (let i = 0; i < 30; i++) await patch(first, `title ${i}`);
+
+    expect(await codeOf(patch(first, "once more"))).toBe("RATE_LIMITED");
+    await patch(second, "unaffected");
+  });
+});
+
+// The password throttle is the same lesson as the one above: `pastes.unlock` is
+// public and `client` is a string the caller picks, so the per-client cap alone
+// is a suggestion. The per-paste cap is what actually binds.
+describe("unlock throttling", () => {
+  const PASSWORD = "correct horse battery";
+
+  async function protectedPaste() {
+    const t = convexTest(schema, modules);
+    const { token, updateToken } = await createPaste(t);
+    await t.mutation(api.pastes.setPassword, {
+      token,
+      updateToken,
+      password: PASSWORD,
+    });
+    const guess = (password: string, client: string) =>
+      t.mutation(api.pastes.unlock, { subdomain: token, password, client });
+    return { t, token, guess };
+  }
+
+  it("caps a paste under attack however the caller labels itself", async () => {
+    const { guess } = await protectedPaste();
+
+    // A fresh identifier per guess walks straight past the per-client cap.
+    for (let i = 0; i < MAX_UNLOCK_ATTEMPTS_PER_PASTE; i++)
+      expect(await guess(`guess ${i}`, `attacker-${i}`)).toEqual({
+        ok: false,
+        reason: "invalid",
+      });
+
+    expect(await guess("one more", "attacker-fresh")).toEqual({
+      ok: false,
+      reason: "throttled",
+    });
+    // And past the cap the right password is refused too, which is the cost of
+    // the cap binding at all: the paste is shut for 15 minutes, not forever.
+    expect(await guess(PASSWORD, "an-honest-visitor")).toEqual({
+      ok: false,
+      reason: "throttled",
+    });
+  });
+
+  it("still gives one client its own smaller budget", async () => {
+    const { guess } = await protectedPaste();
+
+    for (let i = 0; i < MAX_UNLOCK_ATTEMPTS; i++)
+      expect(await guess("wrong", "1.2.3.4")).toEqual({
+        ok: false,
+        reason: "invalid",
+      });
+
+    expect(await guess(PASSWORD, "1.2.3.4")).toEqual({
+      ok: false,
+      reason: "throttled",
+    });
+    // The per-paste cap is nowhere near spent, so a second visitor is fine.
+    expect(await guess(PASSWORD, "5.6.7.8")).toMatchObject({ ok: true });
+  });
+
+  it("sweeps attempt windows that have reset", async () => {
+    const { t, guess } = await protectedPaste();
+    await guess("wrong", "1.2.3.4");
+    const rows = () => t.run((ctx) => ctx.db.query("unlockAttempts").collect());
+
+    // One row for the client, one for the paste.
+    await t.mutation(internal.pastes.sweepUnlockAttempts, {});
+    expect(await rows()).toHaveLength(2);
+
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(Date.now() + UNLOCK_WINDOW_MS + 1_000);
+      await t.mutation(internal.pastes.sweepUnlockAttempts, {});
+    } finally {
+      vi.useRealTimers();
+    }
+    // Without this cron a guesser minting a fresh `client` per attempt grows
+    // the table for good.
+    expect(await rows()).toHaveLength(0);
   });
 });

@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
+import type { Scope } from "./schema";
 import { codeOf, createPaste, users } from "../test/convex-helpers";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -137,5 +138,76 @@ describe("folders.remove", () => {
     for (const token of tokens) {
       expect(await t.query(api.pastes.getByToken, { token })).not.toBeNull();
     }
+  });
+});
+
+// Both folder scopes were grantable and checked nowhere until Milestone 15: a
+// scope that does nothing reads as a boundary that is not there.
+describe("API-key scopes", () => {
+  const keyFor = (
+    actor: ReturnType<typeof users>["alice"],
+    scopes: Scope[],
+  ): Promise<{ key: string }> =>
+    actor.mutation(api.apiKeys.create, { name: "ci", scopes });
+
+  it("lets a folders-scoped key do folder work, and no other key", async () => {
+    const { t, alice } = setup();
+    const { key: full } = await keyFor(alice, [
+      "folders:read",
+      "folders:write",
+    ]);
+    const { key: readOnly } = await keyFor(alice, ["folders:read"]);
+    const { key: pastesOnly } = await keyFor(alice, ["pastes:write"]);
+
+    const folderId = await t.mutation(api.folders.create, {
+      name: "Work",
+      apiKey: full,
+    });
+    expect(await t.query(api.folders.list, { apiKey: readOnly })).toHaveLength(
+      1,
+    );
+    expect(
+      await t.query(api.folders.get, { folderId, apiKey: readOnly }),
+    ).toMatchObject({ name: "Work" });
+
+    // Reading is not writing, and a paste key is neither.
+    for (const key of [readOnly, pastesOnly])
+      expect(
+        await codeOf(
+          t.mutation(api.folders.rename, { folderId, name: "x", apiKey: key }),
+        ),
+      ).toBe("FORBIDDEN");
+    expect(
+      await codeOf(
+        t.mutation(api.folders.remove, { folderId, apiKey: pastesOnly }),
+      ),
+    ).toBe("FORBIDDEN");
+    expect(
+      await codeOf(t.query(api.folders.list, { apiKey: pastesOnly })),
+    ).toBe("FORBIDDEN");
+  });
+
+  it("keeps a paste-only key out of folder membership", async () => {
+    const { t, alice } = setup();
+    const { key } = await keyFor(alice, ["pastes:write", "folders:write"]);
+    const { key: pastesOnly } = await keyFor(alice, ["pastes:write"]);
+    const folderId = await alice.mutation(api.folders.create, { name: "Work" });
+    const { token } = await createPaste(alice);
+
+    // Refiling edits folder membership, so `pastes:write` alone is not enough
+    // — through `update`, or through the folder argument on `create`.
+    expect(
+      await codeOf(
+        t.mutation(api.pastes.update, { token, apiKey: pastesOnly, folderId }),
+      ),
+    ).toBe("FORBIDDEN");
+    expect(
+      await codeOf(createPaste(alice, { apiKey: pastesOnly, folderId })),
+    ).toBe("FORBIDDEN");
+
+    await t.mutation(api.pastes.update, { token, apiKey: key, folderId });
+    expect(await alice.query(api.pastes.getOwned, { token })).toMatchObject({
+      folderId,
+    });
   });
 });

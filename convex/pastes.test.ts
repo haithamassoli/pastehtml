@@ -128,6 +128,111 @@ describe("custom subdomains", () => {
       (await t.query(api.pastes.getByToken, { token }))?.customSubdomain,
     ).toBe("keeper");
   });
+
+  it("assigns, changes and removes through update", async () => {
+    const { alice } = setup();
+    const { token } = await createPaste(alice);
+
+    await alice.mutation(api.pastes.update, {
+      token,
+      customSubdomain: "My-Demo",
+    });
+    expect(
+      (await alice.query(api.pastes.getOwned, { token })).customSubdomain,
+    ).toBe("my-demo");
+
+    await alice.mutation(api.pastes.update, {
+      token,
+      customSubdomain: "second-name",
+    });
+    // The old name is free again the moment the change commits.
+    expect(
+      await alice.query(api.pastes.getByCustomSubdomain, {
+        subdomain: "my-demo",
+      }),
+    ).toBeNull();
+    expect(
+      (
+        await alice.query(api.pastes.resolveForRuntime, {
+          subdomain: "second-name",
+        })
+      )?.token,
+    ).toBe(token);
+
+    await alice.mutation(api.pastes.update, { token, customSubdomain: null });
+    expect(
+      (await alice.query(api.pastes.getOwned, { token })).customSubdomain,
+    ).toBeUndefined();
+    expect(
+      await alice.query(api.pastes.resolveForRuntime, {
+        subdomain: "second-name",
+      }),
+    ).toBeNull();
+  });
+
+  it("refuses a taken name and a caller who does not own the paste", async () => {
+    const { alice, bob } = setup();
+    const mine = await createPaste(alice, { customSubdomain: "taken-name" });
+    const theirs = await createPaste(bob);
+
+    expect(
+      await codeOf(
+        bob.mutation(api.pastes.update, {
+          token: theirs.token,
+          customSubdomain: "taken-name",
+        }),
+      ),
+    ).toBe("CONFLICT");
+    expect(
+      await codeOf(
+        bob.mutation(api.pastes.update, {
+          token: mine.token,
+          customSubdomain: "hijacked",
+        }),
+      ),
+    ).toBe("FORBIDDEN");
+    expect(
+      (await alice.query(api.pastes.getOwned, { token: mine.token }))
+        .customSubdomain,
+    ).toBe("taken-name");
+  });
+
+  it("lets an anonymous holder claim a name with the update token", async () => {
+    const t = convexTest(schema, modules);
+    const { token, updateToken } = await createPaste(t);
+
+    await t.mutation(api.pastes.update, {
+      token,
+      updateToken,
+      customSubdomain: "anon-demo",
+    });
+    expect(
+      (await t.query(api.pastes.resolveForRuntime, { subdomain: "anon-demo" }))
+        ?.token,
+    ).toBe(token);
+    expect(
+      await codeOf(
+        t.mutation(api.pastes.update, { token, customSubdomain: "no-token" }),
+      ),
+    ).toBe("UNAUTHORIZED");
+  });
+
+  it("reports availability without throwing", async () => {
+    const { t, alice } = setup();
+    const { token } = await createPaste(alice, {
+      customSubdomain: "mine-already",
+    });
+    const check = (subdomain: string, forToken?: string) =>
+      t.query(api.pastes.checkSubdomain, { subdomain, token: forToken });
+
+    expect(await check("wide-open")).toEqual({ available: true });
+    expect((await check("mine-already")).available).toBe(false);
+    expect((await check("www")).available).toBe(false);
+    expect((await check("no")).available).toBe(false);
+    expect((await check("under_score")).available).toBe(false);
+    // Its own name is available to itself, matching the no-op re-assign.
+    expect(await check("Mine-Already", token)).toEqual({ available: true });
+  });
 });
 
 describe("anonymous update-token authorization", () => {
@@ -439,6 +544,7 @@ describe("pastes.resolveForRuntime", () => {
     expect(Object.keys(resolved!).sort()).toEqual([
       "contentLength",
       "contentType",
+      "disabled",
       "filename",
       "locked",
       "sha256",
