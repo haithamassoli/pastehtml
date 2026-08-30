@@ -51,7 +51,8 @@ export default defineSchema({
     .index("by_token", ["token"])
     .index("by_custom_subdomain", ["customSubdomain"])
     .index("by_owner", ["ownerId"])
-    .index("by_folder", ["folderId"]),
+    .index("by_folder", ["folderId"])
+    .index("by_storage", ["storageId"]),
 
   folders: defineTable({
     ownerId: v.string(),

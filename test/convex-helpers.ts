@@ -2,9 +2,13 @@
 // bundler never tries to deploy it as a backend module.
 import type { TestConvex } from "convex-test";
 import type { ConvexError } from "convex/values";
+import type { FunctionArgs } from "convex/server";
+import { api } from "@/convex/_generated/api";
 import type schema from "@/convex/schema";
 
 type T = TestConvex<typeof schema>;
+/** `t` itself or one of its signed-in identities. */
+type Actor = ReturnType<T["withIdentity"]>;
 
 /**
  * Resolves to the stable error code a Convex function rejected with, and
@@ -21,10 +25,27 @@ export async function codeOf(
   throw new Error("expected a rejection");
 }
 
-export function storeHtml(t: T, html = "<h1>hello</h1>") {
+export function storeHtml(t: Actor, html = "<h1>hello</h1>") {
   return t.run((ctx) =>
     ctx.storage.store(new Blob([html], { type: "text/html" })),
   );
+}
+
+/**
+ * Creates a paste over a freshly stored upload. Each call uploads its own file
+ * because a storage id may only ever back a single paste.
+ */
+export async function createPaste(
+  t: Actor,
+  args: Partial<FunctionArgs<typeof api.pastes.create>> = {},
+  html = "<h1>hello</h1>",
+) {
+  return await t.mutation(api.pastes.create, {
+    storageId: await storeHtml(t, html),
+    filename: "index.html",
+    contentType: "text/html",
+    ...args,
+  });
 }
 
 /** Two distinct signed-in Clerk identities. */

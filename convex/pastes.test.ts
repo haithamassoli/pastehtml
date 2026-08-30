@@ -3,7 +3,8 @@ import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { codeOf, storeHtml, users } from "../test/convex-helpers";
+import { MAX_UPLOAD_BYTES } from "./lib/validation";
+import { codeOf, createPaste, storeHtml, users } from "../test/convex-helpers";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -15,14 +16,8 @@ function setup() {
 describe("pastes.create", () => {
   it("issues an update token to anonymous authors only once", async () => {
     const t = convexTest(schema, modules);
-    const storageId = await storeHtml(t);
 
-    const result = await t.mutation(api.pastes.create, {
-      storageId,
-      filename: "index.html",
-      contentType: "text/html",
-      contentLength: 11,
-    });
+    const result = await createPaste(t);
 
     expect(result.token).toHaveLength(12);
     expect(result.updateToken).toHaveLength(32);
@@ -39,14 +34,10 @@ describe("pastes.create", () => {
   });
 
   it("owns the paste when signed in and issues no update token", async () => {
-    const { t, alice } = setup();
-    const storageId = await storeHtml(t);
+    const { alice } = setup();
 
-    const result = await alice.mutation(api.pastes.create, {
-      storageId,
-      filename: "index.html",
+    const result = await createPaste(alice, {
       contentType: "text/html; charset=utf-8",
-      contentLength: 11,
       title: "  My demo  ",
     });
 
@@ -60,101 +51,70 @@ describe("pastes.create", () => {
 
   it("rejects invalid uploads with stable error codes", async () => {
     const t = convexTest(schema, modules);
-    const storageId = await storeHtml(t);
-    const base = {
-      storageId,
-      filename: "index.html",
-      contentType: "text/html",
-      contentLength: 11,
-    };
 
+    expect(await codeOf(createPaste(t, {}, ""))).toBe("VALIDATION");
+    expect(await codeOf(createPaste(t, { contentType: "image/png" }))).toBe(
+      "UNSUPPORTED_MEDIA_TYPE",
+    );
     expect(
-      await codeOf(
-        t.mutation(api.pastes.create, { ...base, contentLength: 0 }),
-      ),
-    ).toBe("VALIDATION");
-    expect(
-      await codeOf(
-        t.mutation(api.pastes.create, { ...base, contentType: "image/png" }),
-      ),
-    ).toBe("UNSUPPORTED_MEDIA_TYPE");
-    expect(
-      await codeOf(
-        t.mutation(api.pastes.create, {
-          ...base,
-          contentLength: 5 * 1024 * 1024 + 1,
-        }),
-      ),
+      await codeOf(createPaste(t, {}, "x".repeat(MAX_UPLOAD_BYTES + 1))),
     ).toBe("PAYLOAD_TOO_LARGE");
-    expect(
-      await codeOf(
-        t.mutation(api.pastes.create, { ...base, filename: "a/b.html" }),
-      ),
-    ).toBe("VALIDATION");
+    expect(await codeOf(createPaste(t, { filename: "a/b.html" }))).toBe(
+      "VALIDATION",
+    );
   });
 
   it("allocates unique tokens across many pastes", async () => {
     const t = convexTest(schema, modules);
-    const storageId = await storeHtml(t);
     const tokens = new Set<string>();
     for (let i = 0; i < 25; i++) {
-      const { token } = await t.mutation(api.pastes.create, {
-        storageId,
-        filename: "index.html",
-        contentType: "text/html",
-        contentLength: 11,
-      });
+      const { token } = await createPaste(t);
       tokens.add(token);
     }
     expect(tokens.size).toBe(25);
+  });
+
+  it("refuses an upload that already backs another paste", async () => {
+    const t = convexTest(schema, modules);
+    const storageId = await storeHtml(t);
+
+    await createPaste(t, { storageId });
+    expect(await codeOf(createPaste(t, { storageId }))).toBe("CONFLICT");
+  });
+
+  it("refuses a storage id that does not exist", async () => {
+    const t = convexTest(schema, modules);
+    const storageId = await storeHtml(t);
+    await t.run((ctx) => ctx.storage.delete(storageId));
+
+    expect(await codeOf(createPaste(t, { storageId }))).toBe("NOT_FOUND");
   });
 });
 
 describe("custom subdomains", () => {
   it("normalizes, rejects reserved names, and enforces uniqueness", async () => {
     const t = convexTest(schema, modules);
-    const storageId = await storeHtml(t);
-    const base = {
-      storageId,
-      filename: "index.html",
-      contentType: "text/html",
-      contentLength: 11,
-    };
 
-    const created = await t.mutation(api.pastes.create, {
-      ...base,
-      customSubdomain: "My-Demo",
-    });
+    const created = await createPaste(t, { customSubdomain: "My-Demo" });
     const found = await t.query(api.pastes.getByCustomSubdomain, {
       subdomain: "my-demo",
     });
     expect(found?.token).toBe(created.token);
 
-    expect(
-      await codeOf(
-        t.mutation(api.pastes.create, { ...base, customSubdomain: "www" }),
-      ),
-    ).toBe("CONFLICT");
-    expect(
-      await codeOf(
-        t.mutation(api.pastes.create, { ...base, customSubdomain: "my-demo" }),
-      ),
-    ).toBe("CONFLICT");
-    expect(
-      await codeOf(
-        t.mutation(api.pastes.create, { ...base, customSubdomain: "-nope" }),
-      ),
-    ).toBe("VALIDATION");
+    expect(await codeOf(createPaste(t, { customSubdomain: "www" }))).toBe(
+      "CONFLICT",
+    );
+    expect(await codeOf(createPaste(t, { customSubdomain: "my-demo" }))).toBe(
+      "CONFLICT",
+    );
+    expect(await codeOf(createPaste(t, { customSubdomain: "-nope" }))).toBe(
+      "VALIDATION",
+    );
   });
 
   it("lets a paste keep its own subdomain on update", async () => {
     const t = convexTest(schema, modules);
-    const storageId = await storeHtml(t);
-    const { token, updateToken } = await t.mutation(api.pastes.create, {
-      storageId,
-      filename: "index.html",
-      contentType: "text/html",
-      contentLength: 11,
+    const { token, updateToken } = await createPaste(t, {
       customSubdomain: "keeper",
     });
 
@@ -173,13 +133,7 @@ describe("custom subdomains", () => {
 describe("anonymous update-token authorization", () => {
   it("accepts the issued token and refuses anything else", async () => {
     const t = convexTest(schema, modules);
-    const storageId = await storeHtml(t);
-    const { token, updateToken } = await t.mutation(api.pastes.create, {
-      storageId,
-      filename: "index.html",
-      contentType: "text/html",
-      contentLength: 11,
-    });
+    const { token, updateToken } = await createPaste(t);
 
     await t.mutation(api.pastes.update, {
       token,
@@ -207,12 +161,7 @@ describe("anonymous update-token authorization", () => {
   it("authorizes anonymous deletion and drops the stored file", async () => {
     const t = convexTest(schema, modules);
     const storageId = await storeHtml(t);
-    const { token, updateToken } = await t.mutation(api.pastes.create, {
-      storageId,
-      filename: "index.html",
-      contentType: "text/html",
-      contentLength: 11,
-    });
+    const { token, updateToken } = await createPaste(t, { storageId });
 
     expect(await codeOf(t.mutation(api.pastes.remove, { token }))).toBe(
       "UNAUTHORIZED",
@@ -229,13 +178,7 @@ describe("anonymous update-token authorization", () => {
 describe("owner authorization", () => {
   it("keeps one user out of another user's paste", async () => {
     const { t, alice, bob } = setup();
-    const storageId = await storeHtml(t);
-    const { token } = await alice.mutation(api.pastes.create, {
-      storageId,
-      filename: "index.html",
-      contentType: "text/html",
-      contentLength: 11,
-    });
+    const { token } = await createPaste(alice);
 
     expect(
       await codeOf(bob.mutation(api.pastes.update, { token, title: "Mine" })),
@@ -266,16 +209,9 @@ describe("owner authorization", () => {
 
   it("lists only the caller's own pastes and requires sign-in", async () => {
     const { t, alice, bob } = setup();
-    const storageId = await storeHtml(t);
-    const paste = {
-      storageId,
-      filename: "index.html",
-      contentType: "text/html",
-      contentLength: 11,
-    };
-    await alice.mutation(api.pastes.create, paste);
-    await alice.mutation(api.pastes.create, paste);
-    await bob.mutation(api.pastes.create, paste);
+    await createPaste(alice);
+    await createPaste(alice);
+    await createPaste(bob);
 
     expect(await alice.query(api.pastes.listByOwner, {})).toHaveLength(2);
     expect(await bob.query(api.pastes.listByOwner, {})).toHaveLength(1);
@@ -289,11 +225,8 @@ describe("content replacement", () => {
   it("swaps the storage id and deletes only the superseded file", async () => {
     const t = convexTest(schema, modules);
     const original = await storeHtml(t, "<p>v1</p>");
-    const { token, updateToken } = await t.mutation(api.pastes.create, {
+    const { token, updateToken } = await createPaste(t, {
       storageId: original,
-      filename: "index.html",
-      contentType: "text/html",
-      contentLength: 9,
     });
 
     const replacement = await storeHtml(t, "<p>version two</p>");
@@ -302,11 +235,10 @@ describe("content replacement", () => {
       updateToken,
       storageId: replacement,
       contentType: "text/html",
-      contentLength: 18,
     });
 
     const paste = await t.query(api.pastes.getByToken, { token });
-    expect(paste?.contentLength).toBe(18);
+    expect(paste?.contentLength).toBe("<p>version two</p>".length);
     await t.run(async (ctx) => {
       const stored = await ctx.db
         .query("pastes")
@@ -321,11 +253,8 @@ describe("content replacement", () => {
   it("leaves the paste untouched when the replacement is rejected", async () => {
     const t = convexTest(schema, modules);
     const original = await storeHtml(t, "<p>v1</p>");
-    const { token, updateToken } = await t.mutation(api.pastes.create, {
+    const { token, updateToken } = await createPaste(t, {
       storageId: original,
-      filename: "index.html",
-      contentType: "text/html",
-      contentLength: 9,
     });
     const replacement = await storeHtml(t, "<p>v2</p>");
 
@@ -336,7 +265,6 @@ describe("content replacement", () => {
           updateToken,
           storageId: replacement,
           contentType: "image/png",
-          contentLength: 9,
         }),
       ),
     ).toBe("UNSUPPORTED_MEDIA_TYPE");
@@ -355,13 +283,7 @@ describe("content replacement", () => {
 describe("views and internal deletion", () => {
   it("increments the counter and records one row per view", async () => {
     const t = convexTest(schema, modules);
-    const storageId = await storeHtml(t);
-    const { token } = await t.mutation(api.pastes.create, {
-      storageId,
-      filename: "index.html",
-      contentType: "text/html",
-      contentLength: 11,
-    });
+    const { token } = await createPaste(t);
 
     await t.mutation(api.pastes.recordView, { token, referrer: "example.com" });
     await t.mutation(api.pastes.recordView, { token });
@@ -378,13 +300,7 @@ describe("views and internal deletion", () => {
 
   it("hard-deletes without any caller authorization", async () => {
     const { t, alice } = setup();
-    const storageId = await storeHtml(t);
-    const { pasteId, token } = await alice.mutation(api.pastes.create, {
-      storageId,
-      filename: "index.html",
-      contentType: "text/html",
-      contentLength: 11,
-    });
+    const { pasteId, token } = await createPaste(alice);
 
     await t.mutation(internal.pastes.hardDelete, { pasteId });
     expect(await t.query(api.pastes.getByToken, { token })).toBeNull();

@@ -3,7 +3,7 @@ import { convexTest } from "convex-test";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
-import { codeOf, storeHtml, users } from "../test/convex-helpers";
+import { codeOf, createPaste, users } from "../test/convex-helpers";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -11,12 +11,6 @@ function setup() {
   const t = convexTest(schema, modules);
   return { t, ...users(t) };
 }
-
-const HTML = {
-  filename: "index.html",
-  contentType: "text/html",
-  contentLength: 11,
-};
 
 describe("folder ownership", () => {
   it("creates, renames, and lists only the caller's folders", async () => {
@@ -62,12 +56,8 @@ describe("folder ownership", () => {
 describe("paste ↔ folder assignment", () => {
   it("moves a paste in and back out of a folder", async () => {
     const { t, alice } = setup();
-    const storageId = await storeHtml(t);
     const folderId = await alice.mutation(api.folders.create, { name: "Work" });
-    const { token } = await alice.mutation(api.pastes.create, {
-      storageId,
-      ...HTML,
-    });
+    const { token } = await createPaste(alice);
 
     await alice.mutation(api.pastes.update, { token, folderId });
     expect(
@@ -83,41 +73,30 @@ describe("paste ↔ folder assignment", () => {
   });
 
   it("accepts a folder at creation time", async () => {
-    const { t, alice } = setup();
-    const storageId = await storeHtml(t);
+    const { alice } = setup();
     const folderId = await alice.mutation(api.folders.create, { name: "Work" });
 
-    await alice.mutation(api.pastes.create, { storageId, folderId, ...HTML });
+    await createPaste(alice, { folderId });
     expect(
       await alice.query(api.pastes.listByFolder, { folderId }),
     ).toHaveLength(1);
   });
 
   it("prevents cross-account folder assignment", async () => {
-    const { t, alice, bob } = setup();
-    const storageId = await storeHtml(t);
+    const { alice, bob } = setup();
     const aliceFolder = await alice.mutation(api.folders.create, {
       name: "Alice",
     });
-    const { token } = await bob.mutation(api.pastes.create, {
-      storageId,
-      ...HTML,
-    });
+    const { token } = await createPaste(bob);
 
     expect(
       await codeOf(
         bob.mutation(api.pastes.update, { token, folderId: aliceFolder }),
       ),
     ).toBe("NOT_FOUND");
-    expect(
-      await codeOf(
-        bob.mutation(api.pastes.create, {
-          storageId,
-          folderId: aliceFolder,
-          ...HTML,
-        }),
-      ),
-    ).toBe("NOT_FOUND");
+    expect(await codeOf(createPaste(bob, { folderId: aliceFolder }))).toBe(
+      "NOT_FOUND",
+    );
     expect(
       await codeOf(
         bob.query(api.pastes.listByFolder, { folderId: aliceFolder }),
@@ -127,14 +106,9 @@ describe("paste ↔ folder assignment", () => {
 
   it("refuses to file an anonymous paste", async () => {
     const { t, alice } = setup();
-    const storageId = await storeHtml(t);
     const folderId = await alice.mutation(api.folders.create, { name: "Work" });
 
-    expect(
-      await codeOf(
-        t.mutation(api.pastes.create, { storageId, folderId, ...HTML }),
-      ),
-    ).toBe("FORBIDDEN");
+    expect(await codeOf(createPaste(t, { folderId }))).toBe("FORBIDDEN");
   });
 });
 
@@ -144,16 +118,11 @@ describe("folders.remove", () => {
 
   it("keeps the contained pastes and detaches them", async () => {
     const { t, alice } = setup();
-    const storageId = await storeHtml(t);
     const folderId = await alice.mutation(api.folders.create, { name: "Work" });
 
     const tokens: string[] = [];
     for (let i = 0; i < 3; i++) {
-      const { token } = await alice.mutation(api.pastes.create, {
-        storageId,
-        folderId,
-        ...HTML,
-      });
+      const { token } = await createPaste(alice, { folderId });
       tokens.push(token);
     }
 

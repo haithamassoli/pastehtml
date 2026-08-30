@@ -175,49 +175,49 @@ Store uploaded HTML in Convex File Storage while preserving the original content
 
 ### Storage Abstraction
 
-- [ ] Create a storage helper module
-- [ ] Implement browser upload URL generation
-- [ ] Implement file storage metadata retrieval
-- [ ] Implement file deletion
-- [ ] Implement file replacement
-- [ ] Implement storage cleanup helpers
-- [ ] Implement storage ownership validation
-- [ ] Ensure Convex storage IDs are never trusted without authorization checks
+- [x] Create a storage helper module
+- [x] Implement browser upload URL generation
+- [x] Implement file storage metadata retrieval — `describeUpload` reads size/type from `_storage`
+- [x] Implement file deletion
+- [x] Implement file replacement — `pastes.replaceContent`
+- [x] Implement storage cleanup helpers — `storage.sweepOrphans`, hourly cron
+- [x] Implement storage ownership validation
+- [x] Ensure Convex storage IDs are never trusted without authorization checks — size/type come from storage metadata, and a storage id already backing a paste is refused
 
 ### Upload Validation
 
-- [ ] Define the initial maximum HTML upload size
-- [ ] Validate upload size before paste creation
-- [ ] Validate non-empty content
-- [ ] Validate allowed content type
-- [ ] Preserve uploaded bytes without HTML sanitization
-- [ ] Reject unsupported payloads with structured errors
+- [x] Define the initial maximum HTML upload size
+- [x] Validate upload size before paste creation
+- [x] Validate non-empty content
+- [x] Validate allowed content type
+- [x] Preserve uploaded bytes without HTML sanitization
+- [x] Reject unsupported payloads with structured errors
 
 ### Browser Upload Flow
 
-- [ ] Implement request for a signed Convex upload URL
-- [ ] Implement direct browser-to-Convex upload
-- [ ] Return the resulting storage ID
-- [ ] Create paste metadata after successful upload
-- [ ] Handle abandoned uploads
-- [ ] Handle failed uploads
-- [ ] Add cleanup strategy for orphaned storage objects
+- [x] Implement request for a signed Convex upload URL
+- [x] Implement direct browser-to-Convex upload
+- [x] Return the resulting storage ID
+- [x] Create paste metadata after successful upload
+- [x] Handle abandoned uploads — swept once unreferenced past the grace period
+- [x] Handle failed uploads — structured `AppError`, uploaded bytes left to the sweep
+- [x] Add cleanup strategy for orphaned storage objects
 
 ### File Replacement
 
-- [ ] Implement replacement upload flow
-- [ ] Update paste storage ID atomically where possible
-- [ ] Delete old storage object after successful replacement
-- [ ] Prevent old content deletion before new content is committed
-- [ ] Test rollback behavior after failed replacement
+- [x] Implement replacement upload flow
+- [x] Update paste storage ID atomically where possible
+- [x] Delete old storage object after successful replacement
+- [x] Prevent old content deletion before new content is committed
+- [x] Test rollback behavior after failed replacement
 
 ## Milestone Acceptance Criteria
 
-- [ ] HTML is stored in Convex File Storage
-- [ ] Paste metadata references stored HTML correctly
-- [ ] Browser uploads bypass unnecessary Vercel proxying
-- [ ] Replacing HTML does not corrupt existing pastes
-- [ ] Orphaned file cleanup has a defined implementation
+- [x] HTML is stored in Convex File Storage
+- [x] Paste metadata references stored HTML correctly
+- [x] Browser uploads bypass unnecessary Vercel proxying
+- [x] Replacing HTML does not corrupt existing pastes
+- [x] Orphaned file cleanup has a defined implementation
 
 ---
 

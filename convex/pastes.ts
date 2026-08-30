@@ -18,10 +18,9 @@ import {
   generateUpdateToken,
   sha256Hex,
 } from "./lib/tokens";
+import { describeUpload, deleteFile, requireUnreferenced } from "./storage";
 import {
   fail,
-  validateContentLength,
-  validateContentType,
   validateCustomSubdomain,
   validateDescription,
   validateFilename,
@@ -112,7 +111,6 @@ export const create = mutation({
     storageId: v.id("_storage"),
     filename: v.string(),
     contentType: v.string(),
-    contentLength: v.number(),
     title: v.optional(v.string()),
     description: v.optional(v.string()),
     customSubdomain: v.optional(v.string()),
@@ -129,6 +127,8 @@ export const create = mutation({
     const now = Date.now();
 
     if (args.folderId) await requireOwnFolder(ctx, args.folderId, user?.id);
+    await requireUnreferenced(ctx, args.storageId);
+    const upload = await describeUpload(ctx, args.storageId, args.contentType);
 
     const updateToken = user ? undefined : generateUpdateToken();
     const pasteId = await ctx.db.insert("pastes", {
@@ -145,8 +145,8 @@ export const create = mutation({
       customSubdomain: args.customSubdomain
         ? await claimSubdomain(ctx, args.customSubdomain)
         : undefined,
-      contentType: validateContentType(args.contentType),
-      contentLength: validateContentLength(args.contentLength),
+      contentType: upload.contentType,
+      contentLength: upload.contentLength,
       updateTokenHash: updateToken ? await sha256Hex(updateToken) : undefined,
       visibility: "public",
       viewsCount: 0,
@@ -256,25 +256,28 @@ export const replaceContent = mutation({
     updateToken: v.optional(v.string()),
     storageId: v.id("_storage"),
     contentType: v.string(),
-    contentLength: v.number(),
     filename: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const paste = await requireByToken(ctx, args.token);
     await authorizePasteWrite(ctx, paste, args.updateToken);
+    await requireUnreferenced(ctx, args.storageId, paste._id);
+    const upload = await describeUpload(ctx, args.storageId, args.contentType);
 
+    // The new id is committed before the old file is dropped, so a rejected
+    // replacement always leaves the paste pointing at intact content.
     const previous = paste.storageId;
     await ctx.db.patch("pastes", paste._id, {
       storageId: args.storageId,
-      contentType: validateContentType(args.contentType),
-      contentLength: validateContentLength(args.contentLength),
+      contentType: upload.contentType,
+      contentLength: upload.contentLength,
       ...(args.filename === undefined
         ? {}
         : { filename: validateFilename(args.filename) }),
       updatedAt: Date.now(),
     });
-    if (previous !== args.storageId) await ctx.storage.delete(previous);
+    if (previous !== args.storageId) await deleteFile(ctx, previous);
     return null;
   },
 });
@@ -303,7 +306,7 @@ export const hardDelete = internalMutation({
 
 async function hardDeletePaste(ctx: MutationCtx, paste: Doc<"pastes">) {
   await ctx.db.delete("pastes", paste._id);
-  await ctx.storage.delete(paste.storageId);
+  await deleteFile(ctx, paste.storageId);
   // ponytail: analytics rows are left behind. Add a scheduled batch sweep if
   // orphaned pasteViews ever show up in storage usage.
 }
