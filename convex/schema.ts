@@ -85,10 +85,23 @@ export default defineSchema({
     userAgentFamily: v.optional(v.string()),
   }).index("by_paste_and_timestamp", ["pasteId", "timestamp"]),
 
-  // Unlock sessions for password-protected pastes (Milestone 9 populates these).
+  // Unlock sessions for password-protected pastes. Only the SHA-256 of the
+  // session secret is stored, exactly as with anonymous update tokens.
   pasteUnlocks: defineTable({
     pasteId: v.id("pastes"),
     sessionHash: v.string(),
     expiresAt: v.number(),
-  }).index("by_session_hash", ["sessionHash"]),
+  })
+    .index("by_session_hash", ["sessionHash"])
+    // Revoking every session for a paste when its password changes.
+    .index("by_paste", ["pasteId"]),
+
+  // Password-attempt throttling, one row per (paste, client). Rewritten in
+  // place rather than appended to, so the table stays bounded.
+  unlockAttempts: defineTable({
+    pasteId: v.id("pastes"),
+    client: v.string(),
+    count: v.number(),
+    resetAt: v.number(),
+  }).index("by_paste_and_client", ["pasteId", "client"]),
 });

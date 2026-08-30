@@ -6,8 +6,10 @@ import {
 } from "next/server";
 import {
   PASTE_RUNTIME_PREFIX,
+  UNLOCK_COOKIE,
   isRuntimePath,
   pasteSubdomain,
+  readCookie,
 } from "@/lib/host";
 
 const clerk = clerkMiddleware();
@@ -40,12 +42,19 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
   return clerk(request, event);
 }
 
-/** Anything the browser might attach that could authenticate the app. */
-const CREDENTIAL_HEADERS = ["cookie", "authorization"];
-
+/**
+ * Everything the browser might attach that could authenticate the app is
+ * dropped. The `Cookie` header is rebuilt from scratch rather than filtered, so
+ * the runtime can only ever see the paste's own unlock session — never a Clerk
+ * cookie, however it was scoped.
+ */
 function withoutCredentials(headers: Headers): Headers {
   const stripped = new Headers(headers);
-  for (const name of CREDENTIAL_HEADERS) stripped.delete(name);
+  stripped.delete("authorization");
+
+  const unlock = readCookie(headers.get("cookie"), UNLOCK_COOKIE);
+  if (unlock) stripped.set("cookie", `${UNLOCK_COOKIE}=${unlock}`);
+  else stripped.delete("cookie");
   return stripped;
 }
 

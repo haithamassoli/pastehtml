@@ -325,9 +325,9 @@ Verified live on 2026-08-30 against `pastehtml.assoli.site`.
 - [x] Fetch HTML from Convex File Storage
 - [x] Return stored HTML as `text/html` — the stored content type, verbatim
 - [x] Return 404 for missing paste
-- [x] Return disabled-state response when applicable — 401 for a `protected`
-      paste until Milestone 9 adds the unlock page; there is no disabled flag
-      until Milestone 15 adds paste-disable
+- [x] Return disabled-state response when applicable — a `protected` paste gets
+      the unlock challenge (Milestone 9); there is no disabled flag until
+      Milestone 15 adds paste-disable
 - [x] Add cache headers
 - [x] Add ETag support — Convex's stored SHA-256 digest
 - [x] Add conditional request support — `If-None-Match` → 304
@@ -574,9 +574,8 @@ Create the realtime management experience for signed-in users.
 - [x] Add file replacement — `replaceHtml`, so the public URL is unchanged and
       the old file is dropped only after the new one commits
 - [x] Add folder management — same visibility rule as the list filter
-- [ ] Add password settings — **deferred to Milestone 9**, which owns the
-      hashing, the unlock flow and the rate limiting the UI would drive. There
-      is no mutation to set a password until then.
+- [x] Add password settings — enable, change and remove, over
+      `pastes.setPassword` / `pastes.removePassword` (Milestone 9)
 - [x] Add analytics summary — the live view total, plus size and last update.
       Milestone 12 turns that into a real breakdown.
 - [x] Add destructive delete action
@@ -669,48 +668,79 @@ Allow paste owners to require a password before public content is served.
 
 ### Password Management
 
-- [ ] Select a modern password hashing library compatible with the runtime
-- [ ] Implement password hashing
-- [ ] Implement password verification
-- [ ] Ensure plaintext passwords are never stored
-- [ ] Add enable-password UI
-- [ ] Add change-password UI
-- [ ] Add remove-password UI
+- [x] Select a modern password hashing library compatible with the runtime —
+      **none**: PBKDF2-HMAC-SHA256 through Web Crypto, which the Convex V8
+      runtime provides natively. argon2id or bcrypt would mean a WASM/native
+      dependency plus a `"use node"` action hop on every attempt; PBKDF2 is the
+      strongest KDF already in the runtime. `convex/lib/password.ts` names the
+      upgrade path.
+- [x] Implement password hashing — 100k iterations, 16-byte random salt
+- [x] Implement password verification — constant-time, and the stored record is
+      self-describing so the cost can be raised without invalidating passwords
+- [x] Ensure plaintext passwords are never stored — only
+      `pbkdf2-sha256$<iterations>$<salt>$<digest>`; `passwordHash` never leaves
+      the backend, and `getOwned` exposes a `hasPassword` boolean instead
+- [x] Add enable-password UI — paste detail page
+- [x] Add change-password UI — the same form once a password is set
+- [x] Add remove-password UI — with a `confirm()`, as the other destructive paths
 
 ### Unlock Flow
 
-- [ ] Detect protected pastes in wildcard runtime
-- [ ] Render password challenge page
-- [ ] Submit password securely
-- [ ] Verify password server-side
-- [ ] Create paste-specific unlock session
-- [ ] Scope unlock state to one paste only
-- [ ] Set expiration
-- [ ] Add logout/forget-unlock behavior if needed
+- [x] Detect protected pastes in wildcard runtime — `resolveForRuntime` returns
+      `locked`, and withholds the storage URL and digest with it, so the content
+      is gated in Convex rather than at the serving layer
+- [x] Render password challenge page — `challenge.ts`, static HTML under
+      `default-src 'none'` with no user-controlled content
+- [x] Submit password securely — same-origin `POST /` on the paste host
+- [x] Verify password server-side — `pastes.unlock`; the runtime only relays
+- [x] Create paste-specific unlock session — `pasteUnlocks`, storing only the
+      SHA-256 of the session secret
+- [x] Scope unlock state to one paste only — two independent layers: the cookie
+      is host-only to that subdomain, and the session names its paste, so a
+      copied cookie unlocks nothing else
+- [x] Set expiration — 12 hours, checked on every resolve; expired sessions for a
+      paste are swept on its next successful unlock
+- [x] ~~Add logout/forget-unlock behavior if needed~~ — not needed: the cookie is
+      session-scoped to one paste and expires on its own, and changing or
+      removing the password revokes every outstanding session.
 
 ### Abuse Prevention
 
-- [ ] Rate limit password attempts
-- [ ] Add temporary lockout rules if needed
-- [ ] Ensure responses do not expose password validity details unnecessarily
-- [ ] Log suspicious attempt patterns safely
+- [x] Rate limit password attempts — 10 per (paste, client address) per 15
+      minutes. `unlock` _returns_ rejections rather than throwing, because a
+      Convex mutation is a transaction and a throw would roll back the very
+      counter that throttles the attack.
+- [x] Add temporary lockout rules if needed — the window is the lockout; past the
+      cap even the correct password is refused until it resets
+- [x] Ensure responses do not expose password validity details unnecessarily —
+      unknown paste, unprotected paste and wrong password return an identical
+      value, asserted in `convex/password.test.ts`
+- [x] Log suspicious attempt patterns safely — a `console.warn` naming the paste,
+      the client and the count when a lockout trips; never the attempted password
 
 ### Tests
 
-- [ ] Test correct password
-- [ ] Test incorrect password
-- [ ] Test expired unlock session
-- [ ] Test unlock isolation between pastes
-- [ ] Test password removal
-- [ ] Test password replacement
-- [ ] Test rate limiting
+- [x] Test correct password
+- [x] Test incorrect password — including a prefix of the right one
+- [x] Test expired unlock session
+- [x] Test unlock isolation between pastes
+- [x] Test password removal
+- [x] Test password replacement — old sessions and the old password both die
+- [x] Test rate limiting — the cap, that a correct password is refused past it,
+      that a second client is unaffected, and that success clears the budget
+
+Across `convex/lib/password.test.ts`, `convex/password.test.ts`, the runtime
+route's own suite, `proxy.test.ts` (the unlock cookie is the only one that
+crosses into a paste origin) and `e2e/password.spec.ts`.
 
 ## Milestone Acceptance Criteria
 
-- [ ] Owners can enable and remove password protection
-- [ ] Protected pastes cannot be viewed without a valid password
-- [ ] Unlock state is isolated per paste
-- [ ] Password brute-force attempts are rate-limited
+- [x] Owners can enable and remove password protection
+- [x] Protected pastes cannot be viewed without a valid password — the wildcard
+      runtime challenges, and the raw and preview endpoints stay closed because
+      the host-only unlock cookie never reaches the app origin
+- [x] Unlock state is isolated per paste
+- [x] Password brute-force attempts are rate-limited
 
 ---
 
@@ -1589,7 +1619,7 @@ The rebuild is considered complete when all launch-critical milestones are compl
 - [ ] Raw paste URLs work
 - [ ] Preview routes work
 - [x] Folder management works
-- [ ] Password protection works
+- [x] Password protection works
 - [ ] API keys work
 - [ ] REST API publishing works
 - [ ] MCP publishing works

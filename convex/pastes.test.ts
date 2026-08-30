@@ -440,6 +440,7 @@ describe("pastes.resolveForRuntime", () => {
       "contentLength",
       "contentType",
       "filename",
+      "locked",
       "sha256",
       "token",
       "url",

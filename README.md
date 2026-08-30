@@ -63,16 +63,42 @@ user rather than anonymously.
 
 A wildcard paste host never reaches Clerk. `proxy.ts` branches on the Host header
 before `clerkMiddleware` runs, so there is no handshake and no session cookie on
-`<token>.pastehtml.assoli.site`; the rewrite into the runtime also strips
-`Cookie` and `Authorization`, so a domain-scoped cookie added by mistake still
-would not arrive. `e2e/auth.spec.ts` signs in for real and then asserts both
-halves: the app cookie carries no leading-dot Domain, and `document.cookie` is
-empty inside a paste.
+`<token>.pastehtml.assoli.site`; the rewrite into the runtime also drops
+`Authorization` and rebuilds `Cookie` from scratch, keeping only the paste's own
+`ph_unlock` session, so a domain-scoped Clerk cookie added by mistake still would
+not arrive. `e2e/auth.spec.ts` signs in for real and then asserts both halves:
+the app cookie carries no leading-dot Domain, and `document.cookie` is empty
+inside a paste.
 
 There is no cookie-authenticated mutating endpoint in the app — Convex
 authenticates with a bearer JWT, not cookies, and the app has no Server Actions —
 so there is nothing for a cross-site request to forge. Milestone 15 revisits this
 alongside the full header and CSP audit.
+
+### Password-protected pastes
+
+`pastes.setPassword` hashes with PBKDF2-HMAC-SHA256 through Web Crypto — the
+strongest KDF the Convex V8 runtime has natively, so an unlock needs no Node
+action. Only `pbkdf2-sha256$<iterations>$<salt>$<digest>` is stored, and the
+record is self-describing so the cost can be raised without invalidating
+existing passwords.
+
+`resolveForRuntime` withholds the storage URL and the digest for a protected
+paste, so the content is gated in Convex rather than at the serving layer. The
+wildcard runtime answers with a challenge page; a correct password mints an
+unlock session whose SHA-256 is stored in `pasteUnlocks` and whose secret goes
+back as a host-only `HttpOnly` cookie. Both layers scope it: the browser sends
+it only to that subdomain, and the session names its paste, so a copied cookie
+unlocks nothing else. Changing or removing the password revokes every session.
+
+Attempts are throttled per (paste, client address) — 10 in 15 minutes — so one
+attacker cannot lock a shared paste out for everyone. `pastes.unlock` _returns_
+its rejections rather than throwing, because a Convex mutation is a transaction
+and throwing would roll back the attempt counter. Every rejection looks
+identical, so the response never confirms that a subdomain exists.
+
+The raw and preview endpoints live on the app origin, which the host-only unlock
+cookie never reaches, so they stay closed for a protected paste.
 
 ### Claiming an anonymous paste
 

@@ -8,6 +8,26 @@ import { config } from "./config";
 /** Internal path the wildcard runtime is rewritten to. Never publicly routable. */
 export const PASTE_RUNTIME_PREFIX = "/internal/paste";
 
+/**
+ * The one cookie a paste origin may carry. It is host-only, so the browser
+ * already scopes it to a single paste; Convex checks the session names that
+ * paste anyway, so neither layer is trusted alone.
+ */
+export const UNLOCK_COOKIE = "ph_unlock";
+
+/** Reads one cookie out of a raw `Cookie` header. */
+export function readCookie(
+  header: string | null | undefined,
+  name: string,
+): string | undefined {
+  for (const part of (header ?? "").split(";")) {
+    const eq = part.indexOf("=");
+    if (eq > 0 && part.slice(0, eq).trim() === name)
+      return part.slice(eq + 1).trim() || undefined;
+  }
+  return undefined;
+}
+
 /** Paths on a paste origin that serve the stored HTML. Everything else is 404. */
 const RUNTIME_PATHS = new Set(["/", "/index.html"]);
 

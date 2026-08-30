@@ -17,6 +17,7 @@ const PASTE = {
   token: "abc123def456",
   filename: "index.html",
   visibility: "public" as const,
+  locked: false,
   contentType: "text/html; charset=utf-8",
   contentLength: HTML.length,
   sha256: "digest",
@@ -83,7 +84,12 @@ describe("preview endpoint", () => {
     query.mockResolvedValue(null);
     expect((await get()).status).toBe(404);
 
-    query.mockResolvedValue({ ...PASTE, visibility: "protected" });
+    query.mockResolvedValue({
+      ...PASTE,
+      visibility: "protected",
+      locked: true,
+      url: null,
+    });
     expect((await get()).status).toBe(401);
   });
 });

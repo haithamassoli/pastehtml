@@ -15,24 +15,40 @@ vi.mock("convex/browser", () => ({
 // The real `after` needs a request scope; the spy proves the call is deferred.
 vi.mock("next/server", () => ({ after }));
 
-const { GET } = await import("./route");
+const { GET, POST } = await import("./route");
 
 const PASTE = {
   token: "abc123def456",
   visibility: "public" as const,
+  locked: false,
   contentType: "text/html; charset=utf-8",
   contentLength: 16,
   sha256: "digest",
   url: "https://storage.test/file",
 };
 
+const params = {
+  params: Promise.resolve({ subdomain: "abc123def456" }),
+} as never;
+
 const get = (headers: Record<string, string> = {}) =>
   GET(
     new Request("http://abc123def456.localhost/", { headers }) as never,
-    {
-      params: Promise.resolve({ subdomain: "abc123def456" }),
-    } as never,
+    params,
   );
+
+const post = (password: string, headers: Record<string, string> = {}) => {
+  const body = new FormData();
+  body.set("password", password);
+  return POST(
+    new Request("http://abc123def456.localhost/", {
+      method: "POST",
+      body,
+      headers,
+    }) as never,
+    params,
+  );
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -105,13 +121,43 @@ describe("paste runtime", () => {
     expect((await get()).status).toBe(404);
   });
 
-  it("withholds a protected paste until Milestone 9 unlocks it", async () => {
-    query.mockResolvedValue({ ...PASTE, visibility: "protected" });
+  it("challenges for a locked paste instead of serving it", async () => {
+    query.mockResolvedValue({
+      ...PASTE,
+      visibility: "protected",
+      locked: true,
+      url: null,
+    });
 
     const response = await get();
+    const body = await response.text();
 
     expect(response.status).toBe(401);
     expect(fetch).not.toHaveBeenCalled();
+    expect(response.headers.get("Content-Type")).toBe(
+      "text/html; charset=utf-8",
+    );
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(body).toContain('name="password"');
+    // The challenge page is ours; nothing from the paste may load into it.
+    expect(response.headers.get("Content-Security-Policy")).toContain(
+      "default-src 'none'",
+    );
+    // A locked paste is not counted as a view.
+    expect(after).not.toHaveBeenCalled();
+  });
+
+  it("serves a protected paste once the unlock cookie is valid", async () => {
+    query.mockResolvedValue({ ...PASTE, visibility: "protected" });
+
+    const response = await get({ cookie: "ph_unlock=session-secret" });
+
+    expect(response.status).toBe(200);
+    // The cookie is what the query is asked to validate — never trusted here.
+    expect(query).toHaveBeenCalledWith(expect.anything(), {
+      subdomain: "abc123def456",
+      unlockToken: "session-secret",
+    });
   });
 
   it("502s when storage is unreachable", async () => {
@@ -121,5 +167,60 @@ describe("paste runtime", () => {
     );
 
     expect((await get()).status).toBe(502);
+  });
+});
+
+describe("unlock", () => {
+  it("sets a host-only, script-unreadable cookie and redirects", async () => {
+    mutation.mockResolvedValue({
+      ok: true,
+      unlockToken: "granted",
+      expiresAt: Date.now() + 60_000,
+    });
+
+    const response = await post("correct horse");
+    const cookie = response.headers.get("Set-Cookie")!;
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("Location")).toBe("/");
+    expect(cookie).toContain("ph_unlock=granted");
+    expect(cookie).toContain("HttpOnly");
+    // No Domain attribute: the browser scopes it to this paste's host alone.
+    expect(cookie).not.toContain("Domain=");
+  });
+
+  it("passes the caller's address along for throttling", async () => {
+    mutation.mockResolvedValue({
+      ok: true,
+      unlockToken: "g",
+      expiresAt: Date.now(),
+    });
+
+    await post("pw", { "x-forwarded-for": "203.0.113.7, 10.0.0.1" });
+
+    expect(mutation).toHaveBeenCalledWith(expect.anything(), {
+      subdomain: "abc123def456",
+      password: "pw",
+      client: "203.0.113.7",
+    });
+  });
+
+  it("re-challenges on a wrong password without setting a cookie", async () => {
+    mutation.mockResolvedValue({ ok: false, reason: "invalid" });
+
+    const response = await post("wrong");
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("Set-Cookie")).toBeNull();
+    expect(await response.text()).toContain("Incorrect password.");
+  });
+
+  it("answers a throttled attempt with 429", async () => {
+    mutation.mockResolvedValue({ ok: false, reason: "throttled" });
+
+    const response = await post("wrong");
+
+    expect(response.status).toBe(429);
+    expect(await response.text()).toContain("Too many attempts.");
   });
 });

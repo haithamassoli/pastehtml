@@ -16,9 +16,11 @@ import {
 } from "./lib/auth";
 import {
   generatePasteToken,
+  generateUnlockToken,
   generateUpdateToken,
   sha256Hex,
 } from "./lib/tokens";
+import { hashPassword, validatePassword, verifyPassword } from "./lib/password";
 import { describeUpload, deleteFile, requireUnreferenced } from "./storage";
 import {
   fail,
@@ -56,6 +58,8 @@ function ownerPaste(paste: Doc<"pastes">) {
     ...publicPaste(paste),
     folderId: paste.folderId,
     storageId: paste.storageId,
+    // Whether a password is set — never the hash itself.
+    hasPassword: paste.passwordHash !== undefined,
   };
 }
 
@@ -395,9 +399,12 @@ export const getOwned = query({
  * a signed storage URL plus the headers to send with it. Used by the wildcard
  * runtime and by the `/p/[token]` raw and preview endpoints. Lookup is by
  * custom subdomain first, then by public token — both indexed.
+ *
+ * A protected paste with no valid unlock session comes back `locked`, with no
+ * URL and no digest: the content is withheld here, not at the serving layer.
  */
 export const resolveForRuntime = query({
-  args: { subdomain: v.string() },
+  args: { subdomain: v.string(), unlockToken: v.optional(v.string()) },
   returns: v.union(
     v.null(),
     v.object({
@@ -405,11 +412,13 @@ export const resolveForRuntime = query({
       // The uploaded name, for the raw endpoint's `Content-Disposition`.
       filename: v.string(),
       visibility: v.union(v.literal("public"), v.literal("protected")),
+      // Password protected, and this caller has not unlocked it.
+      locked: v.boolean(),
       contentType: v.string(),
       contentLength: v.number(),
       // Convex's stored digest, used verbatim as the ETag.
       sha256: v.string(),
-      // `null` if the stored object has gone missing.
+      // `null` if the stored object has gone missing, or the paste is locked.
       url: v.union(v.string(), v.null()),
     }),
   ),
@@ -424,15 +433,203 @@ export const resolveForRuntime = query({
         .unique()) ?? (await byToken(ctx, subdomain));
     if (!paste) return null;
 
-    const metadata = await ctx.db.system.get("_storage", paste.storageId);
+    const locked =
+      paste.visibility === "protected" &&
+      !(await hasValidUnlock(ctx, paste._id, args.unlockToken));
+
+    const metadata = locked
+      ? null
+      : await ctx.db.system.get("_storage", paste.storageId);
     return {
       token: paste.token,
       filename: paste.filename,
       visibility: paste.visibility,
+      locked,
       contentType: paste.contentType,
       contentLength: paste.contentLength,
       sha256: metadata?.sha256 ?? "",
       url: metadata ? await ctx.storage.getUrl(paste.storageId) : null,
     };
+  },
+});
+
+// --- Password protection -----------------------------------------------------
+
+/** How long an unlock lasts before the visitor is challenged again. */
+export const UNLOCK_TTL_MS = 12 * 60 * 60 * 1000;
+
+// ponytail: throttling is per (paste, client-IP). It stops the practical
+// online attack without letting one attacker lock a shared paste out for
+// everyone; an attacker with a pool of addresses still gets
+// MAX_UNLOCK_ATTEMPTS per address, which Milestone 15's global rate limiting
+// is where to fix.
+export const MAX_UNLOCK_ATTEMPTS = 10;
+export const UNLOCK_WINDOW_MS = 15 * 60 * 1000;
+
+/** True when `unlockToken` names a live session for exactly this paste. */
+async function hasValidUnlock(
+  ctx: QueryCtx,
+  pasteId: Id<"pastes">,
+  unlockToken: string | undefined,
+): Promise<boolean> {
+  if (!unlockToken) return false;
+  const sessionHash = await sha256Hex(unlockToken);
+  const session = await ctx.db
+    .query("pasteUnlocks")
+    .withIndex("by_session_hash", (q) => q.eq("sessionHash", sessionHash))
+    .unique();
+  // The session names its paste, so a cookie carried to another paste — or
+  // replayed after the password changed — unlocks nothing.
+  return (
+    session !== null &&
+    session.pasteId === pasteId &&
+    session.expiresAt > Date.now()
+  );
+}
+
+/** Drops every unlock session for a paste. Used on password change and removal. */
+async function revokeUnlocks(ctx: MutationCtx, pasteId: Id<"pastes">) {
+  const sessions = await ctx.db
+    .query("pasteUnlocks")
+    .withIndex("by_paste", (q) => q.eq("pasteId", pasteId))
+    .collect();
+  for (const session of sessions)
+    await ctx.db.delete("pasteUnlocks", session._id);
+}
+
+/**
+ * Enables password protection, or replaces the existing password. Either way
+ * every outstanding unlock session is revoked, so a changed password takes
+ * effect for visitors immediately.
+ */
+export const setPassword = mutation({
+  args: {
+    token: v.string(),
+    updateToken: v.optional(v.string()),
+    password: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const paste = await requireByToken(ctx, args.token);
+    await authorizePasteWrite(ctx, paste, args.updateToken);
+
+    await ctx.db.patch("pastes", paste._id, {
+      passwordHash: await hashPassword(validatePassword(args.password)),
+      visibility: "protected",
+      updatedAt: Date.now(),
+    });
+    await revokeUnlocks(ctx, paste._id);
+    return null;
+  },
+});
+
+/** Removes password protection and makes the paste public again. */
+export const removePassword = mutation({
+  args: { token: v.string(), updateToken: v.optional(v.string()) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const paste = await requireByToken(ctx, args.token);
+    await authorizePasteWrite(ctx, paste, args.updateToken);
+
+    await ctx.db.patch("pastes", paste._id, {
+      passwordHash: undefined,
+      visibility: "public",
+      updatedAt: Date.now(),
+    });
+    await revokeUnlocks(ctx, paste._id);
+    return null;
+  },
+});
+
+/**
+ * Verifies a password and issues an unlock session. Public, because the visitor
+ * being challenged is by definition not signed in.
+ *
+ * A rejection is *returned*, not thrown: a Convex mutation is a transaction, so
+ * throwing would roll back the very attempt counter that throttles the attack.
+ * Every rejection also looks the same — unknown paste, unprotected paste, wrong
+ * password — so the answer never confirms that a subdomain exists or that a
+ * guess was close.
+ */
+export const unlock = mutation({
+  args: {
+    subdomain: v.string(),
+    password: v.string(),
+    /** Client identifier for throttling. The runtime passes the caller's IP. */
+    client: v.string(),
+  },
+  returns: v.union(
+    v.object({
+      ok: v.literal(true),
+      unlockToken: v.string(),
+      expiresAt: v.number(),
+    }),
+    v.object({
+      ok: v.literal(false),
+      reason: v.union(v.literal("invalid"), v.literal("throttled")),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const invalid = { ok: false, reason: "invalid" } as const;
+    const subdomain = args.subdomain.trim().toLowerCase();
+    const paste =
+      (await ctx.db
+        .query("pastes")
+        .withIndex("by_custom_subdomain", (q) =>
+          q.eq("customSubdomain", subdomain),
+        )
+        .unique()) ?? (await byToken(ctx, subdomain));
+    if (!paste?.passwordHash) return invalid;
+
+    const now = Date.now();
+    const client = args.client.slice(0, 64);
+    const attempts = await ctx.db
+      .query("unlockAttempts")
+      .withIndex("by_paste_and_client", (q) =>
+        q.eq("pasteId", paste._id).eq("client", client),
+      )
+      .unique();
+    const live = attempts && attempts.resetAt > now ? attempts : null;
+
+    if (live && live.count >= MAX_UNLOCK_ATTEMPTS) {
+      // Safe to log: the paste and the source, never the attempted password.
+      console.warn(
+        `unlock throttled paste=${paste._id} client=${client} count=${live.count}`,
+      );
+      return { ok: false, reason: "throttled" } as const;
+    }
+
+    if (!(await verifyPassword(args.password, paste.passwordHash))) {
+      const record = {
+        pasteId: paste._id,
+        client,
+        count: (live?.count ?? 0) + 1,
+        resetAt: live?.resetAt ?? now + UNLOCK_WINDOW_MS,
+      };
+      if (attempts)
+        await ctx.db.replace("unlockAttempts", attempts._id, record);
+      else await ctx.db.insert("unlockAttempts", record);
+      return invalid;
+    }
+
+    if (attempts) await ctx.db.delete("unlockAttempts", attempts._id);
+
+    // Self-cleaning: expired sessions for this paste go on the way past, so
+    // the table never needs a sweep of its own.
+    for (const session of await ctx.db
+      .query("pasteUnlocks")
+      .withIndex("by_paste", (q) => q.eq("pasteId", paste._id))
+      .collect())
+      if (session.expiresAt <= now)
+        await ctx.db.delete("pasteUnlocks", session._id);
+
+    const unlockToken = generateUnlockToken();
+    const expiresAt = now + UNLOCK_TTL_MS;
+    await ctx.db.insert("pasteUnlocks", {
+      pasteId: paste._id,
+      sessionHash: await sha256Hex(unlockToken),
+      expiresAt,
+    });
+    return { ok: true, unlockToken, expiresAt } as const;
   },
 });

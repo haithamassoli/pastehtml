@@ -5,6 +5,7 @@ import {
   normalizeHost,
   pasteSubdomain,
   subdomainOf,
+  readCookie,
 } from "./host";
 
 // Tests run with NEXT_PUBLIC_APP_URL=http://localhost:3000 (vitest.config.ts).
@@ -95,5 +96,24 @@ describe("isRuntimePath", () => {
     expect(isRuntimePath("/index.html")).toBe(true);
     expect(isRuntimePath("/other.html")).toBe(false);
     expect(isRuntimePath("/favicon.ico")).toBe(false);
+  });
+});
+
+describe("readCookie", () => {
+  it("finds a cookie among others", () => {
+    const header = "__session=abc; ph_unlock=secret; other=1";
+    expect(readCookie(header, "ph_unlock")).toBe("secret");
+    expect(readCookie(header, "other")).toBe("1");
+  });
+
+  it("matches the whole name, never a suffix or a prefix", () => {
+    const header = "xph_unlock=wrong; ph_unlock_extra=wrong";
+    expect(readCookie(header, "ph_unlock")).toBeUndefined();
+  });
+
+  it("returns undefined for a missing, empty or absent header", () => {
+    expect(readCookie("a=1", "ph_unlock")).toBeUndefined();
+    expect(readCookie("ph_unlock=", "ph_unlock")).toBeUndefined();
+    expect(readCookie(null, "ph_unlock")).toBeUndefined();
   });
 });

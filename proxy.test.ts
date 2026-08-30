@@ -70,6 +70,29 @@ describe("wildcard paste hosts", () => {
     expect(JSON.stringify([...response.headers])).not.toContain("stolen");
   });
 
+  it("forwards nothing but the paste's own unlock cookie", async () => {
+    const response = await run(
+      "http://abc123.localhost:3000/",
+      "abc123.localhost:3000",
+      {
+        cookie: "__session=stolen; ph_unlock=mine; __clerk_db_jwt=stolen",
+        authorization: "Bearer stolen",
+      },
+    );
+
+    const overridden = response.headers
+      .get("x-middleware-override-headers")!
+      .split(",");
+    // The Cookie header is rebuilt from scratch, not filtered in place, so a
+    // Clerk cookie cannot survive however it was scoped.
+    expect(overridden).toContain("cookie");
+    expect(overridden).not.toContain("authorization");
+    expect(response.headers.get("x-middleware-request-cookie")).toBe(
+      "ph_unlock=mine",
+    );
+    expect(JSON.stringify([...response.headers])).not.toContain("stolen");
+  });
+
   it("cannot rewrite into a privileged internal route", async () => {
     // A paste host is pinned to its own subdomain regardless of the path asked
     // for, so one paste origin can never address another paste or an app route.

@@ -52,11 +52,14 @@ function PasteDetail({ token }: { token: string }) {
   const folders = useQuery(api.folders.list, {});
   const update = useMutation(api.pastes.update);
   const remove = useMutation(api.pastes.remove);
+  const setPassword = useMutation(api.pastes.setPassword);
+  const removePassword = useMutation(api.pastes.removePassword);
   const convex = useConvex();
   const router = useRouter();
 
   // `null` means "not editing", so a live update from elsewhere still shows up.
   const [draftTitle, setDraftTitle] = useState<string | null>(null);
+  const [password, setPasswordDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -224,8 +227,56 @@ function PasteDetail({ token }: { token: string }) {
         </Section>
       )}
 
-      {/* Password protection lands with Milestone 9, which owns the hashing,
-          the unlock flow and the rate limiting behind it. */}
+      <Section title="Password protection">
+        <p className="text-muted-foreground text-xs">
+          {paste.hasPassword
+            ? "Visitors must enter the password before the public URL serves anything. Changing it signs out everyone who has already unlocked it."
+            : "Set a password to require it before the public URL serves anything."}
+        </p>
+        <form
+          className="flex flex-col gap-2 sm:flex-row"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void run(async () => {
+              await setPassword({ token, password });
+              setPasswordDraft("");
+            });
+          }}
+        >
+          <input
+            type="password"
+            value={password}
+            autoComplete="new-password"
+            onChange={(event) => setPasswordDraft(event.target.value)}
+            placeholder={paste.hasPassword ? "New password" : "Password"}
+            aria-label={paste.hasPassword ? "New password" : "Password"}
+            className="border-border focus-visible:border-ring focus-visible:ring-ring/50 h-8 flex-1 rounded-lg border px-2.5 text-sm outline-none focus-visible:ring-3"
+          />
+          <Button type="submit" size="sm" disabled={busy || password === ""}>
+            {paste.hasPassword ? "Change password" : "Enable password"}
+          </Button>
+          {paste.hasPassword && (
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={busy}
+              onClick={() => {
+                // ponytail: platform confirm(), as with the delete paths.
+                if (
+                  !confirm(
+                    "Remove the password? Anyone with the URL will be able to view this paste.",
+                  )
+                )
+                  return;
+                void run(() => removePassword({ token }));
+              }}
+            >
+              Remove password
+            </Button>
+          )}
+        </form>
+      </Section>
 
       <Section title="Preview">
         {/* The render endpoint already serves this under a CSP sandbox; the

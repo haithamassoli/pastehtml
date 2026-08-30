@@ -22,6 +22,7 @@ export function randomString(length: number): string {
 
 export const generatePasteToken = () => randomString(PASTE_TOKEN_LENGTH);
 export const generateUpdateToken = () => randomString(UPDATE_TOKEN_LENGTH);
+export const generateUnlockToken = () => randomString(UPDATE_TOKEN_LENGTH);
 
 export async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest(

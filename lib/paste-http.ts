@@ -50,19 +50,30 @@ function matchesEtag(header: string | null, etag: string): boolean {
 }
 
 /**
- * Looks a paste up by custom subdomain or public token. Returns the `Response`
- * to send instead when it is missing or withheld, so every surface answers an
- * unavailable paste identically.
+ * Looks a paste up by custom subdomain or public token. `unlockToken` is the
+ * visitor's unlock session, if they hold one; without a valid session a
+ * password-protected paste comes back `locked` and carries no content URL.
+ */
+export const lookupPaste = (subdomain: string, unlockToken?: string) =>
+  convex.query(api.pastes.resolveForRuntime, { subdomain, unlockToken });
+
+/**
+ * `lookupPaste`, plus the `Response` to send instead when the paste is missing
+ * or withheld — so every surface answers an unavailable paste identically. The
+ * wildcard runtime uses `lookupPaste` directly, because it answers a locked
+ * paste with the unlock challenge rather than a bare 401.
  */
 export async function resolvePaste(
   subdomain: string,
+  unlockToken?: string,
 ): Promise<AvailablePaste | Response> {
-  const paste = await convex.query(api.pastes.resolveForRuntime, { subdomain });
+  const paste = await lookupPaste(subdomain, unlockToken);
 
   if (!paste) return plain(404, "Paste not found.");
-  if (paste.visibility === "protected")
-    // Milestone 9 replaces this with the unlock challenge page.
-    return plain(401, "This paste is password protected.");
+  // ponytail: the unlock session is a host-only cookie on the paste origin, so
+  // it is never sent to the app origin — raw and preview stay closed for a
+  // protected paste. Give them their own challenge if that becomes a real ask.
+  if (paste.locked) return plain(401, "This paste is password protected.");
   if (!paste.url) return plain(404, "Paste content is unavailable.");
   return { ...paste, url: paste.url };
 }
