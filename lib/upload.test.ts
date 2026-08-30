@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { getFunctionName } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import { publishHtml, uploadFile } from "./upload";
+import { pasteUrls } from "./urls";
 import type { AppError } from "./errors";
 
 /** Minimal stand-in for the Convex client: records calls, returns canned values. */
@@ -89,6 +90,7 @@ describe("publishHtml", () => {
     expect(await publishHtml(client, html(), { title: "Demo" })).toEqual({
       pasteId: "p1",
       token: "abc",
+      ...pasteUrls("abc"),
     });
     expect(calls[1].name).toBe(getFunctionName(api.pastes.create));
     expect(calls[1].args).toEqual({

@@ -4,6 +4,7 @@ import type { ConvexReactClient } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { AppError } from "./errors";
+import { pasteUrls } from "./urls";
 import { MAX_UPLOAD_BYTES } from "@/convex/lib/validation";
 
 export type PublishOptions = {
@@ -12,9 +13,12 @@ export type PublishOptions = {
   customSubdomain?: string;
 };
 
+/** The create-paste response contract, shared by every publishing surface. */
 export type PublishResult = {
   pasteId: string;
   token: string;
+  publicUrl: string;
+  rawUrl: string;
   /** Anonymous pastes only, and only ever returned here. */
   updateToken?: string;
 };
@@ -58,12 +62,13 @@ export async function publishHtml(
   options: PublishOptions = {},
 ): Promise<PublishResult> {
   const storageId = await uploadFile(convex, file);
-  return await convex.mutation(api.pastes.create, {
+  const created = await convex.mutation(api.pastes.create, {
     storageId,
     filename: file.name || "index.html",
     contentType: file.type || "text/html",
     ...options,
   });
+  return { ...created, ...pasteUrls(created.token) };
 }
 
 /**

@@ -231,53 +231,53 @@ Implement the simplest core product flow: upload HTML and immediately receive a 
 
 ### Public Publishing UI
 
-- [ ] Create the home page publishing interface
-- [ ] Add drag-and-drop HTML upload
-- [ ] Add file picker upload
-- [ ] Add paste-from-text option if desired
-- [ ] Display upload progress
-- [ ] Display validation errors
-- [ ] Display successful publish result
-- [ ] Add copy-public-URL action
-- [ ] Add copy-raw-URL action
-- [ ] Add publish-another action
+- [x] Create the home page publishing interface
+- [x] Add drag-and-drop HTML upload
+- [x] Add file picker upload
+- [x] Add paste-from-text option if desired — textarea on the home page
+- [x] Display upload progress — indeterminate; `fetch` exposes none, XHR upgrade noted in the page
+- [x] Display validation errors
+- [x] Display successful publish result
+- [x] Add copy-public-URL action
+- [x] Add copy-raw-URL action
+- [x] Add publish-another action
 
 ### Anonymous Authorization
 
-- [ ] Generate a secure anonymous update token
-- [ ] Store only a hash of the anonymous update token
-- [ ] Return the raw update token only once
-- [ ] Implement update authorization using the token
-- [ ] Implement delete authorization using the token
-- [ ] Ensure tokens are never logged
+- [x] Generate a secure anonymous update token
+- [x] Store only a hash of the anonymous update token — SHA-256 in `pastes.updateTokenHash`
+- [x] Return the raw update token only once
+- [x] Implement update authorization using the token
+- [x] Implement delete authorization using the token
+- [x] Ensure tokens are never logged — `lib/logger.ts` redacts any `*token*` field
 
 ### API Response
 
-- [ ] Define the create-paste response contract
-- [ ] Return paste identifier
-- [ ] Return public URL
-- [ ] Return raw URL
-- [ ] Return update token for anonymous pastes
-- [ ] Add consistent error responses
+- [x] Define the create-paste response contract — `PublishResult` in `lib/upload.ts`
+- [x] Return paste identifier
+- [x] Return public URL — `pasteUrls()` in `lib/urls.ts`
+- [x] Return raw URL
+- [x] Return update token for anonymous pastes
+- [x] Add consistent error responses
 
 ### Tests
 
-- [ ] Test anonymous browser publishing
-- [ ] Test invalid upload
-- [ ] Test oversized upload
-- [ ] Test empty upload
-- [ ] Test update-token generation
-- [ ] Test unauthorized anonymous update
-- [ ] Test authorized anonymous update
-- [ ] Test authorized anonymous deletion
+- [x] Test anonymous browser publishing — Playwright `e2e/publish.spec.ts`
+- [x] Test invalid upload
+- [x] Test oversized upload
+- [x] Test empty upload
+- [x] Test update-token generation
+- [x] Test unauthorized anonymous update
+- [x] Test authorized anonymous update
+- [x] Test authorized anonymous deletion
 
 ## Milestone Acceptance Criteria
 
-- [ ] A visitor can publish an HTML file without an account
-- [ ] A public paste URL is returned immediately
-- [ ] The anonymous user receives an update token
-- [ ] The update token can securely update or delete the paste
-- [ ] Invalid uploads fail with structured errors
+- [x] A visitor can publish an HTML file without an account
+- [x] A public paste URL is returned immediately
+- [x] The anonymous user receives an update token
+- [x] The update token can securely update or delete the paste
+- [x] Invalid uploads fail with structured errors
 
 ---
 

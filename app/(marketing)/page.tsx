@@ -1,69 +1,217 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { useConvex } from "convex/react";
+import { Button } from "@/components/ui/button";
+import { AppError } from "@/lib/errors";
+import { publishHtml, type PublishResult } from "@/lib/upload";
+import { config } from "@/lib/config";
+
+type Status = "idle" | "publishing" | "done";
 
 export default function Home() {
+  const convex = useConvex();
+  const [status, setStatus] = useState<Status>("idle");
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<PublishResult | null>(null);
+  const [text, setText] = useState("");
+  const [dragging, setDragging] = useState(false);
+
+  async function publish(file: File) {
+    setStatus("publishing");
+    setError(null);
+    try {
+      setResult(await publishHtml(convex, file));
+      setStatus("done");
+    } catch (cause) {
+      setError(messageOf(cause));
+      setStatus("idle");
+    }
+  }
+
+  function publishAnother() {
+    setResult(null);
+    setText("");
+    setError(null);
+    setStatus("idle");
+  }
+
+  if (status === "done" && result)
+    return <Published result={result} onPublishAnother={publishAnother} />;
+
+  const busy = status === "publishing";
+
   return (
-    <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex w-full max-w-3xl flex-1 flex-col items-center justify-between bg-white px-16 py-32 sm:items-start dark:bg-black">
-        <Image
-          className="h-5 w-[100px] dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-8 p-6">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Publish HTML, get a URL
+        </h1>
+        <p className="text-muted-foreground">
+          Drop an HTML file and it goes live instantly. No account needed.
+        </p>
+      </div>
+
+      <label
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragging(false);
+          const file = event.dataTransfer.files[0];
+          if (file) void publish(file);
+        }}
+        className={`focus-within:border-ring flex cursor-pointer flex-col items-center gap-1 rounded-xl border-2 border-dashed p-12 text-center transition-colors ${
+          dragging ? "border-ring bg-muted" : "border-border hover:bg-muted/50"
+        } ${busy ? "pointer-events-none opacity-60" : ""}`}
+      >
+        <span className="font-medium">Drop an HTML file here</span>
+        <span className="text-muted-foreground text-sm">
+          or click to choose one — up to{" "}
+          {Math.round(config.maxUploadBytes / 1024 / 1024)} MB
+        </span>
+        <input
+          type="file"
+          accept=".html,.htm,text/html"
+          className="sr-only"
+          disabled={busy}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file) void publish(file);
+          }}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl leading-10 font-semibold tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+      </label>
+
+      <form
+        className="flex flex-col gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void publish(new File([text], "index.html", { type: "text/html" }));
+        }}
+      >
+        <label htmlFor="html" className="text-sm font-medium">
+          Or paste HTML
+        </label>
+        <textarea
+          id="html"
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          rows={6}
+          spellCheck={false}
+          placeholder="<h1>Hello</h1>"
+          className="border-border focus-visible:border-ring focus-visible:ring-ring/50 rounded-lg border p-3 font-mono text-sm outline-none focus-visible:ring-3"
+        />
+        <Button
+          type="submit"
+          size="lg"
+          className="self-start"
+          disabled={busy || text.trim().length === 0}
+        >
+          Publish
+        </Button>
+      </form>
+
+      <div aria-live="polite" className="min-h-6">
+        {busy && (
+          // ponytail: indeterminate — fetch() exposes no upload progress.
+          // Swap in XMLHttpRequest.upload.onprogress if a real bar is wanted.
+          <div className="bg-muted h-1.5 overflow-hidden rounded-full">
+            <div className="bg-primary h-full w-1/3 animate-pulse rounded-full" />
+          </div>
+        )}
+        {error && (
+          <p role="alert" className="text-destructive text-sm">
+            {error}
           </p>
+        )}
+      </div>
+    </main>
+  );
+}
+
+function Published({
+  result,
+  onPublishAnother,
+}: {
+  result: PublishResult;
+  onPublishAnother: () => void;
+}) {
+  return (
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-6 p-6">
+      <h1 className="text-2xl font-semibold tracking-tight">Published</h1>
+
+      <UrlRow label="Public URL" value={result.publicUrl} />
+      <UrlRow label="Raw URL" value={result.rawUrl} />
+
+      {result.updateToken && (
+        <div className="border-border flex flex-col gap-2 rounded-lg border p-4">
+          <p className="text-sm font-medium">Update token</p>
+          <p className="text-muted-foreground text-sm">
+            Save this now — it is shown once and is the only way to update or
+            delete this paste without an account.
+          </p>
+          <Value value={result.updateToken} />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="bg-foreground text-background flex h-12 w-full items-center justify-center gap-2 rounded-full px-5 transition-colors hover:bg-[#383838] md:w-[158px] dark:hover:bg-[#ccc]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="h-[14px] w-4 dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] md:w-[158px] dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      )}
+
+      <Button size="lg" className="self-start" onClick={onPublishAnother}>
+        Publish another
+      </Button>
+    </main>
+  );
+}
+
+function UrlRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm font-medium">{label}</p>
+      <Value value={value} href={value} />
     </div>
   );
+}
+
+function Value({ value, href }: { value: string; href?: string }) {
+  return (
+    <div className="border-border flex items-center gap-2 rounded-lg border p-2">
+      {href ? (
+        <a
+          href={href}
+          className="flex-1 truncate font-mono text-sm underline-offset-4 hover:underline"
+        >
+          {value}
+        </a>
+      ) : (
+        <code className="flex-1 truncate font-mono text-sm">{value}</code>
+      )}
+      <CopyButton value={value} />
+    </div>
+  );
+}
+
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={async () => {
+        await navigator.clipboard.writeText(value);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+    >
+      {copied ? "Copied" : "Copy"}
+    </Button>
+  );
+}
+
+/** Structured errors carry a user-facing message; anything else is a surprise. */
+function messageOf(cause: unknown): string {
+  if (cause instanceof AppError) return cause.message;
+  const data = (cause as { data?: { message?: string } }).data;
+  return data?.message ?? "Something went wrong. Please try again.";
 }

@@ -16,3 +16,9 @@ test("redacts sensitive top-level and nested fields", () => {
   );
   expect((out.nested as Record<string, unknown>).ok).toBe(1);
 });
+
+test("redacts anonymous update tokens", () => {
+  const out = redact({ token: "abc", updateToken: "z".repeat(32) });
+  expect(out.token).toBe("[REDACTED]");
+  expect(out.updateToken).toBe("[REDACTED]");
+});
