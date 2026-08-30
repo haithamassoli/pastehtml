@@ -26,3 +26,44 @@ jobs:
           NEXT_PUBLIC_CONVEX_URL: https://ci-placeholder.convex.cloud
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ci-placeholder
           CLERK_SECRET_KEY: sk_test_ci-placeholder
+
+  # The end-to-end suite drives the real app in a real browser, so it needs a
+  # real backend: a Convex deployment for storage and the paste runtime, and a
+  # Clerk development instance for the sign-in, sign-up and API-key specs.
+  # Neither can be stubbed, so this job runs only where those credentials exist
+  # — set the repository variable `E2E_ENABLED` to `true` and the secrets below.
+  # Without them it is skipped rather than passing on nothing, and the merge
+  # gate is `check` alone. Point Vercel's "required checks" at both jobs so a
+  # red suite blocks the deployment rather than just the merge.
+  #
+  # The Clerk instance needs the `+clerk_test` fixture user the auth specs sign
+  # in as; README "Testing" has the one command that creates it.
+  e2e:
+    needs: check
+    if: ${{ vars.E2E_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+      NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm i -g npm@12
+      - run: npm ci
+      # Pushes this branch's Convex functions to the deployment the key names,
+      # so the specs run against the backend they were written against.
+      - run: npx convex dev --once
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 7
