@@ -1,0 +1,5 @@
+.next
+node_modules
+convex/_generated
+package-lock.json
+*.woff2

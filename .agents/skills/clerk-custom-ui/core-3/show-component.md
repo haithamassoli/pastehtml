@@ -7,19 +7,19 @@ The `<Show>` component conditionally renders content based on authentication sta
 ## Import
 
 ```typescript
-import { Show } from '@clerk/nextjs'       // Next.js
-import { Show } from '@clerk/react'         // React
-import { Show } from '@clerk/react-router'  // React Router
-import { Show } from '@clerk/expo'          // Expo
+import { Show } from "@clerk/nextjs"; // Next.js
+import { Show } from "@clerk/react"; // React
+import { Show } from "@clerk/react-router"; // React Router
+import { Show } from "@clerk/expo"; // Expo
 ```
 
 ## Props
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `when` | `string \| object \| function` | Condition for rendering children |
-| `fallback?` | `ReactNode` | Content shown when condition fails |
-| `treatPendingAsSignedOut?` | `boolean` | Treat pending sessions as signed-out (default: `true`) |
+| Prop                       | Type                           | Description                                            |
+| -------------------------- | ------------------------------ | ------------------------------------------------------ |
+| `when`                     | `string \| object \| function` | Condition for rendering children                       |
+| `fallback?`                | `ReactNode`                    | Content shown when condition fails                     |
+| `treatPendingAsSignedOut?` | `boolean`                      | Treat pending sessions as signed-out (default: `true`) |
 
 ## `when` Prop Variants
 
@@ -40,7 +40,7 @@ import { Show } from '@clerk/expo'          // Expo
 ### Role Check
 
 ```tsx
-<Show when={{ role: 'org:admin' }}>
+<Show when={{ role: "org:admin" }}>
   <AdminPanel />
 </Show>
 ```
@@ -48,7 +48,7 @@ import { Show } from '@clerk/expo'          // Expo
 ### Permission Check
 
 ```tsx
-<Show when={{ permission: 'org:billing:manage' }}>
+<Show when={{ permission: "org:billing:manage" }}>
   <BillingSettings />
 </Show>
 ```
@@ -56,7 +56,7 @@ import { Show } from '@clerk/expo'          // Expo
 ### Billing Feature Check
 
 ```tsx
-<Show when={{ feature: 'widgets' }}>
+<Show when={{ feature: "widgets" }}>
   <WidgetBuilder />
 </Show>
 ```
@@ -64,7 +64,7 @@ import { Show } from '@clerk/expo'          // Expo
 ### Billing Plan Check
 
 ```tsx
-<Show when={{ plan: 'gold' }}>
+<Show when={{ plan: "gold" }}>
   <PremiumContent />
 </Show>
 ```
@@ -72,7 +72,11 @@ import { Show } from '@clerk/expo'          // Expo
 ### Custom Condition (Function)
 
 ```tsx
-<Show when={(has) => has({ role: 'org:admin' }) || has({ permission: 'org:billing:manage' })}>
+<Show
+  when={(has) =>
+    has({ role: "org:admin" }) || has({ permission: "org:billing:manage" })
+  }
+>
   <SettingsPanel />
 </Show>
 ```
@@ -109,16 +113,16 @@ The `treatPendingAsSignedOut` prop controls how pending sessions (sessions with 
 
 ## Migration from Core 2
 
-| Core 2 | Current |
-|--------|---------|
-| `<SignedIn>` | `<Show when="signed-in">` |
-| `<SignedOut>` | `<Show when="signed-out">` |
-| `<Protect role="org:admin">` | `<Show when={{ role: 'org:admin' }}>` |
+| Core 2                                      | Current                                              |
+| ------------------------------------------- | ---------------------------------------------------- |
+| `<SignedIn>`                                | `<Show when="signed-in">`                            |
+| `<SignedOut>`                               | `<Show when="signed-out">`                           |
+| `<Protect role="org:admin">`                | `<Show when={{ role: 'org:admin' }}>`                |
 | `<Protect permission="org:billing:manage">` | `<Show when={{ permission: 'org:billing:manage' }}>` |
-| `<Protect condition={(has) => expr}>` | `<Show when={(has) => expr}>` |
-| `<Protect fallback={...}>` | `<Show when={...} fallback={...}>` |
-| *(no equivalent)* | `<Show when={{ feature: 'widgets' }}>` |
-| *(no equivalent)* | `<Show when={{ plan: 'gold' }}>` |
+| `<Protect condition={(has) => expr}>`       | `<Show when={(has) => expr}>`                        |
+| `<Protect fallback={...}>`                  | `<Show when={...} fallback={...}>`                   |
+| _(no equivalent)_                           | `<Show when={{ feature: 'widgets' }}>`               |
+| _(no equivalent)_                           | `<Show when={{ plan: 'gold' }}>`                     |
 
 ## Docs
 

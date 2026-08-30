@@ -97,7 +97,7 @@ Adopt every audited destination with the temporary route config. The route expor
 
 ```tsx
 // See: https://nextjs.org/docs/app/guides/adopting-partial-prefetching
-export const prefetch = 'partial'
+export const prefetch = "partial";
 ```
 
 If other URL-specific UI might be worth prefetching but was not part of the legacy contract, keep `prefetch={true}` on its links and mark the route for step 7:
@@ -105,7 +105,7 @@ If other URL-specific UI might be worth prefetching but was not part of the lega
 ```tsx
 // TODO(per-link-prefetch): assess with the user whether URL data should resolve before click.
 // See: https://nextjs.org/docs/app/guides/optimizing-prefetching
-export const prefetch = 'partial'
+export const prefetch = "partial";
 ```
 
 Use that exact prefix so step 7 can grep them back. Do not select new target UI now; restore only the target chosen from the legacy behavior.

@@ -44,15 +44,15 @@ A top-level `await` in a layout blocks everything below it (the most common bloc
 ```tsx
 // ❌ Before: the await + redirect at the top blocks the whole settings frame
 export default async function SettingsLayout({ children }) {
-  const session = await getSession() // your auth library's request-time read; suspends during prerender → frame can't build
-  if (!session?.user) redirect(getLoginUrl())
-  return <Shell>{children}</Shell>
+  const session = await getSession(); // your auth library's request-time read; suspends during prerender → frame can't build
+  if (!session?.user) redirect(getLoginUrl());
+  return <Shell>{children}</Shell>;
 }
 ```
 
 ```tsx
 // ✅ After: render children unconditionally; move the gate into a Suspense child
-import { Suspense } from 'react'
+import { Suspense } from "react";
 
 export default function SettingsLayout({ children }) {
   return (
@@ -62,13 +62,13 @@ export default function SettingsLayout({ children }) {
       </Suspense>
       {children}
     </Shell>
-  )
+  );
 }
 
 async function AuthGate() {
-  const session = await getSession() // the session read suspends during prerender…
-  if (!session?.user) redirect(getLoginUrl()) // …so redirect() never runs at build time
-  return null
+  const session = await getSession(); // the session read suspends during prerender…
+  if (!session?.user) redirect(getLoginUrl()); // …so redirect() never runs at build time
+  return null;
 }
 ```
 

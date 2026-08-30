@@ -1,7 +1,10 @@
 {
   "name": "clerk-nextjs",
   "private": true,
-  "scripts": { "dev": "next dev", "build": "next build" },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build"
+  },
   "dependencies": {
     "next": "latest",
     "react": "latest",

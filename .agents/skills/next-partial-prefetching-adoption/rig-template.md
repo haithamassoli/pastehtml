@@ -39,18 +39,18 @@ An `instant()` test against a production build requires
 builds do not expose the API:
 
 ```ts filename="next.config.ts" highlight={3,8-10}
-import type { NextConfig } from 'next'
+import type { NextConfig } from "next";
 
-const exposeTestingApi = process.env.EXPOSE_TESTING_API === '1'
+const exposeTestingApi = process.env.EXPOSE_TESTING_API === "1";
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
   experimental: {
     exposeTestingApiInProductionBuild: exposeTestingApi,
   },
-}
+};
 
-export default nextConfig
+export default nextConfig;
 ```
 
 Merge the option into an existing `experimental` object instead of replacing

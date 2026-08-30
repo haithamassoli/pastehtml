@@ -3,12 +3,12 @@
 ## Auth Check Pattern
 
 ```typescript
-import { auth } from '@clerk/nextjs/server';
+import { auth } from "@clerk/nextjs/server";
 
 export async function GET() {
   const { isAuthenticated, userId } = await auth();
   if (!isAuthenticated) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   const data = await db.data.findMany({ where: { userId } });
   return Response.json(data);
@@ -25,10 +25,11 @@ export async function GET() {
 ```typescript
 export async function DELETE(req: Request) {
   const { isAuthenticated, has } = await auth();
-  if (!isAuthenticated) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!isAuthenticated)
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  const isAdmin = await has({ role: 'org:admin' });
-  if (!isAdmin) return Response.json({ error: 'Forbidden' }, { status: 403 });
+  const isAdmin = await has({ role: "org:admin" });
+  if (!isAdmin) return Response.json({ error: "Forbidden" }, { status: 403 });
 
   return Response.json({ success: true });
 }
@@ -37,10 +38,14 @@ export async function DELETE(req: Request) {
 ## Org Route Protection
 
 ```typescript
-export async function GET(req: Request, { params }: { params: { orgId: string } }) {
+export async function GET(
+  req: Request,
+  { params }: { params: { orgId: string } },
+) {
   const { userId, orgId } = await auth();
-  if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  if (orgId !== params.orgId) return Response.json({ error: 'Forbidden' }, { status: 403 });
+  if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (orgId !== params.orgId)
+    return Response.json({ error: "Forbidden" }, { status: 403 });
 
   const orgData = await db.orgs.findUnique({ where: { id: orgId } });
   return Response.json(orgData);

@@ -36,12 +36,12 @@ Set `CLERK_PLATFORM_API_KEY` for CI and scripted agent usage. Use `clerk auth lo
 
 ## Accountless: operating without an account
 
-`clerk init` mints a claimable, accountless app (which saves temporary development keys) when unauthenticated — no login, no platform key, no browser. That covers every agent run and human bootstrap; a signed-out human in an *existing* project gets the login flow unless they pass `--keyless`.
+`clerk init` mints a claimable, accountless app (which saves temporary development keys) when unauthenticated — no login, no platform key, no browser. That covers every agent run and human bootstrap; a signed-out human in an _existing_ project gets the login flow unless they pass `--keyless`.
 
 The CLI then finds the secret key in `CLERK_SECRET_KEY`, `.env` / `.env.local`, or `.clerk/.tmp/keyless.json` (an app an older Clerk SDK minted for itself) and works against BAPI:
 
-| Works without an account                                                                                | Needs a claimed app                                              |
-| ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| Works without an account                                                                             | Needs a claimed app                                                  |
+| ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | `whoami`¹, `env pull`, `config pull/patch`, `enable/disable orgs`, `users`, `api`, `doctor`, `open`² | `apps`, `impersonate`, `link`, `enable billing`, `config schema/put` |
 
 ¹ Signed in, `whoami` reports the account and drops the `keyless` object — don't use it to read back `keyless.instanceId`.
@@ -165,12 +165,12 @@ Hits `GET /oauth/userinfo` and prints the email. With no usable session it repor
 
 ## Common auth failure modes
 
-| Symptom                             | Likely cause                                                  | Fix                                                          |
-| ----------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
+| Symptom                             | Likely cause                                                       | Fix                                                                                                                                  |
+| ----------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `Not authenticated`                 | Account-path command with no token and no `CLERK_PLATFORM_API_KEY` | `clerk auth login` or export `CLERK_PLATFORM_API_KEY` — but check the no-account table first; most instance commands need no account |
-| `No Clerk project linked`           | Running a command that needs a linked profile with no `--app` | `clerk link` or pass `--app <id>`                            |
-| `Invalid secret key prefix`         | Passed `ak_...` where `sk_...` expected (or vice versa)       | Check which API the command hits; pass the matching key type |
-| `Unauthorized` from API             | Key belongs to a different instance                           | Verify `--instance` and ensure the key matches               |
-| Sandbox warning + auth/link failure | Host-only Clerk state or system capabilities are blocked      | Rerun the same command on the host before trusting the error |
+| `No Clerk project linked`           | Running a command that needs a linked profile with no `--app`      | `clerk link` or pass `--app <id>`                                                                                                    |
+| `Invalid secret key prefix`         | Passed `ak_...` where `sk_...` expected (or vice versa)            | Check which API the command hits; pass the matching key type                                                                         |
+| `Unauthorized` from API             | Key belongs to a different instance                                | Verify `--instance` and ensure the key matches                                                                                       |
+| Sandbox warning + auth/link failure | Host-only Clerk state or system capabilities are blocked           | Rerun the same command on the host before trusting the error                                                                         |
 
 When in doubt: `clerk doctor --json` walks through all of this and tells you exactly what's wrong.

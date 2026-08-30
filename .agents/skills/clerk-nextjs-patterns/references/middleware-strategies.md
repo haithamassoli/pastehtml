@@ -7,12 +7,12 @@
 Protect specific routes, allow everything else:
 
 ```typescript
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const isProtectedRoute = createRouteMatcher([
-  '/dashboard(.*)',
-  '/settings(.*)',
-  '/api/private(.*)',
+  "/dashboard(.*)",
+  "/settings(.*)",
+  "/api/private(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
@@ -21,8 +21,8 @@ export default clerkMiddleware(async (auth, req) => {
 
 export const config = {
   matcher: [
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    '/(api|trpc)(.*)',
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/(api|trpc)(.*)",
   ],
 };
 ```
@@ -32,13 +32,13 @@ export const config = {
 Block everything, allow specific public routes:
 
 ```typescript
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const isPublicRoute = createRouteMatcher([
-  '/',
-  '/sign-in(.*)',
-  '/sign-up(.*)',
-  '/api/public(.*)',
+  "/",
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/api/public(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
@@ -51,18 +51,19 @@ export default clerkMiddleware(async (auth, req) => {
 For B2B apps where some routes require a specific permission or role, pass a callback to `auth.protect()`. Clerk returns a 404 if the check fails:
 
 ```typescript
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-const isInvoiceRoute = createRouteMatcher(['/invoices(.*)']);
-const isAdminRoute = createRouteMatcher(['/admin(.*)']);
+const isInvoiceRoute = createRouteMatcher(["/invoices(.*)"]);
+const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
   if (isInvoiceRoute(req)) {
-    await auth.protect((has) => has({ permission: 'org:invoices:create' }));
+    await auth.protect((has) => has({ permission: "org:invoices:create" }));
   }
   if (isAdminRoute(req)) {
-    await auth.protect((has) =>
-      has({ role: 'org:admin' }) || has({ role: 'org:billing_manager' })
+    await auth.protect(
+      (has) =>
+        has({ role: "org:admin" }) || has({ role: "org:billing_manager" }),
     );
   }
 });
@@ -77,12 +78,12 @@ Prefer permissions over roles — permissions are more granular and easier to re
 For routes that accept different token types (OAuth tokens, machine-to-machine tokens, API keys), pass a `token` option to `auth.protect()`:
 
 ```typescript
-const isMachineApi = createRouteMatcher(['/api/machine(.*)']);
-const isPublicApi = createRouteMatcher(['/api/public(.*)']);
+const isMachineApi = createRouteMatcher(["/api/machine(.*)"]);
+const isPublicApi = createRouteMatcher(["/api/public(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
-  if (isMachineApi(req)) await auth.protect({ token: 'm2m_token' });
-  if (isPublicApi(req)) await auth.protect({ token: 'any' });
+  if (isMachineApi(req)) await auth.protect({ token: "m2m_token" });
+  if (isPublicApi(req)) await auth.protect({ token: "any" });
 });
 ```
 
@@ -99,8 +100,8 @@ export default clerkMiddleware(async (auth, req) => {
   const { sessionStatus } = await auth();
 
   // Redirect pending sessions to task completion page
-  if (sessionStatus === 'pending') {
-    return NextResponse.redirect(new URL('/sign-in/tasks', req.url));
+  if (sessionStatus === "pending") {
+    return NextResponse.redirect(new URL("/sign-in/tasks", req.url));
   }
 
   if (isProtectedRoute(req)) await auth.protect();

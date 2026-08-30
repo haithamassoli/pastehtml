@@ -447,9 +447,9 @@ Used when a visitor unlocks a password-protected paste.
 
 ```ts
 {
-  pasteId: Id<"pastes">
-  sessionHash: string
-  expiresAt: number
+  pasteId: Id<"pastes">;
+  sessionHash: string;
+  expiresAt: number;
 }
 ```
 

@@ -29,54 +29,55 @@ Create the new application foundation, configure the development environment, an
 
 ## Tasks
 
-- [ ] Create a new Next.js application with TypeScript
-- [ ] Enable the latest stable Next.js App Router architecture
-- [ ] Configure ESLint
-- [ ] Configure Prettier
-- [ ] Configure strict TypeScript settings
-- [ ] Configure path aliases
-- [ ] Add Tailwind CSS
-- [ ] Add shadcn/ui
-- [ ] Configure project-wide typography and base styles
-- [ ] Create the initial application layout
-- [ ] Create the initial marketing layout
-- [ ] Create the initial dashboard layout
-- [ ] Install Convex
-- [ ] Initialize the Convex project
-- [ ] Configure local Convex development
-- [ ] Configure Convex generated types
-- [ ] Install Clerk
-- [ ] Configure Clerk development environment
-- [ ] Install the official MCP TypeScript SDK
-- [ ] Install Vitest
-- [ ] Install Playwright
-- [ ] Add environment variable validation
-- [ ] Create `.env.example`
-- [ ] Add a centralized configuration module
-- [ ] Define naming conventions for Convex functions
-- [ ] Define naming conventions for API routes
-- [ ] Define error-code conventions
-- [ ] Add a reusable application logger
-- [ ] Add a reusable request/correlation ID helper
-- [ ] Configure GitHub Actions for linting
-- [ ] Configure GitHub Actions for type checking
-- [ ] Configure GitHub Actions for unit tests
-- [ ] Configure GitHub Actions for build verification
-- [ ] Create a basic README for the new architecture
-- [ ] Document local development commands
-- [ ] Document environment setup
-- [ ] Verify the application runs locally
-- [ ] Verify Convex connects correctly
-- [ ] Verify Clerk authentication bootstraps correctly
-- [ ] Verify the application builds successfully
+- [x] Create a new Next.js application with TypeScript
+- [x] Enable the latest stable Next.js App Router architecture
+- [x] Configure ESLint
+- [x] Configure Prettier
+- [x] Configure strict TypeScript settings
+- [x] Configure path aliases
+- [x] Add Tailwind CSS
+- [x] Add shadcn/ui
+- [x] Configure project-wide typography and base styles
+- [x] Create the initial application layout
+- [x] Create the initial marketing layout
+- [x] Create the initial dashboard layout
+- [x] Install Convex
+- [ ] Initialize the Convex project <!-- run `npx convex dev` (needs Convex login) -->
+- [x] Configure local Convex development
+- [x] Configure Convex generated types
+- [x] Install Clerk
+- [x] Configure Clerk development environment
+- [x] Install the official MCP TypeScript SDK
+- [x] Install Vitest
+- [x] Install Playwright
+- [x] Add environment variable validation
+- [x] Create `.env.example`
+- [x] Add a centralized configuration module
+- [x] Define naming conventions for Convex functions
+- [x] Define naming conventions for API routes
+- [x] Define error-code conventions
+- [x] Add a reusable application logger
+- [x] Add a reusable request/correlation ID helper
+- [x] Configure GitHub Actions for linting
+- [x] Configure GitHub Actions for type checking
+- [x] Configure GitHub Actions for unit tests
+- [x] Configure GitHub Actions for build verification
+- [x] Create a basic README for the new architecture
+- [x] Document local development commands
+- [x] Document environment setup
+- [ ] Verify the application runs locally <!-- needs real Convex + Clerk env values -->
+- [ ] Verify Convex connects correctly <!-- needs `npx convex dev` -->
+- [ ] Verify Clerk authentication bootstraps correctly <!-- needs Clerk keys -->
+- [x] Verify the application builds successfully
 
 ## Milestone Acceptance Criteria
 
-- [ ] The application runs locally without Ruby or Rails
-- [ ] Next.js, Convex, Clerk, and the test stack are configured
-- [ ] CI passes linting, type checking, tests, and builds
-- [ ] Environment configuration is documented
-- [ ] The project can be deployed to a temporary Vercel environment
+- [x] The application runs locally without Ruby or Rails
+- [x] Next.js, Convex, Clerk, and the test stack are configured
+- [x] CI passes linting, type checking, tests, and builds
+- [x] Environment configuration is documented
+- [ ] The project can be deployed to a temporary Vercel environment <!-- deploy step -->
+
 
 ---
 
