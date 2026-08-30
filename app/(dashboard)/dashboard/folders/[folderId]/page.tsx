@@ -1,0 +1,128 @@
+"use client";
+
+import { use, useState } from "react";
+import Link from "next/link";
+import {
+  Authenticated,
+  AuthLoading,
+  useMutation,
+  useQuery,
+} from "convex/react";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import { CopyButton } from "@/components/copy-button";
+import { Button } from "@/components/ui/button";
+import { errorMessage } from "@/lib/errors";
+import { displayName, isoDate } from "@/lib/paste-list";
+import { pasteUrls } from "@/lib/urls";
+
+export default function FolderDetailPage({
+  params,
+}: PageProps<"/dashboard/folders/[folderId]">) {
+  const { folderId } = use(params);
+  return (
+    <>
+      <AuthLoading>
+        <div
+          aria-busy="true"
+          className="bg-muted h-40 animate-pulse rounded-lg"
+        />
+      </AuthLoading>
+      <Authenticated>
+        <FolderDetail folderId={folderId as Id<"folders">} />
+      </Authenticated>
+    </>
+  );
+}
+
+/**
+ * Both queries authorize against the caller's own Convex identity, so another
+ * account's folder id rejects here and lands on the dashboard error boundary.
+ */
+function FolderDetail({ folderId }: { folderId: Id<"folders"> }) {
+  const folder = useQuery(api.folders.get, { folderId });
+  const pastes = useQuery(api.pastes.listByFolder, { folderId });
+  const update = useMutation(api.pastes.update);
+
+  const [error, setError] = useState<string | null>(null);
+
+  if (folder === undefined || pastes === undefined)
+    return (
+      <div
+        aria-busy="true"
+        className="bg-muted h-40 animate-pulse rounded-lg"
+      />
+    );
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex min-w-0 flex-col">
+        <Link
+          href="/dashboard/folders"
+          className="text-muted-foreground text-sm underline-offset-4 hover:underline"
+        >
+          ← All folders
+        </Link>
+        <h2 className="truncate text-lg font-semibold">{folder.name}</h2>
+      </div>
+
+      {error && (
+        <p role="alert" className="text-destructive text-sm">
+          {error}
+        </p>
+      )}
+
+      {pastes.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          This folder is empty. Move a paste in from its own page.
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {pastes.map((paste) => {
+            const { publicUrl } = pasteUrls(paste.token);
+            return (
+              <li
+                key={paste.token}
+                className="border-border flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="flex min-w-0 flex-col gap-1">
+                  <Link
+                    href={`/dashboard/pastes/${paste.token}`}
+                    className="truncate font-medium underline-offset-4 hover:underline"
+                  >
+                    {displayName(paste)}
+                  </Link>
+                  <a
+                    href={publicUrl}
+                    className="text-muted-foreground truncate font-mono text-xs underline-offset-4 hover:underline"
+                  >
+                    {publicUrl}
+                  </a>
+                  <p className="text-muted-foreground text-xs">
+                    {paste.viewsCount} views · updated{" "}
+                    {isoDate(paste.updatedAt)}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <CopyButton value={publicUrl} label="Copy URL" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setError(null);
+                      void update({ token: paste.token, folderId: null }).catch(
+                        (cause) => setError(errorMessage(cause)),
+                      );
+                    }}
+                  >
+                    Remove from folder
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}

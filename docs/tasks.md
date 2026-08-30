@@ -598,8 +598,8 @@ the second does the work (`e2e/dashboard.spec.ts`).
       reaches the open dashboard
 - [x] Verify folder moves update without refresh — a move is
       `pastes.update({ folderId })` feeding the same `listByOwner` subscription
-      the title edit already proves. Its own e2e needs a folder to move into,
-      so it lands with Milestone 8's folder UI.
+      the title edit already proves; `e2e/folders.spec.ts` now files a paste and
+      finds it under the dashboard's folder filter.
 
 ## Milestone Acceptance Criteria
 
@@ -618,27 +618,44 @@ Allow users to organize pastes into folders.
 
 ## Tasks
 
-- [ ] Create folder list UI
-- [ ] Create new-folder dialog
-- [ ] Implement folder rename UI
-- [ ] Implement folder delete UI
-- [ ] Add folder detail page
-- [ ] Add folder paste list
-- [ ] Add move-paste action
-- [ ] Add remove-from-folder action
-- [ ] Add folder filter to dashboard
-- [ ] Ensure folder ownership is validated
-- [ ] Prevent cross-account folder assignment
-- [ ] Keep pastes when a folder is deleted
-- [ ] Add realtime folder updates
-- [ ] Add folder operation tests
+The domain functions landed in Milestone 1; this milestone is the UI over them.
+
+- [x] Create folder list UI — `app/(dashboard)/dashboard/folders`, plus a
+      "Folders" entry in the dashboard nav
+- [x] Create new-folder dialog — an inline one-field form instead. A modal for a
+      single text input buys nothing, and this way the new folder appears in the
+      list directly beneath it.
+- [x] Implement folder rename UI — the platform's own `prompt()`, as the delete
+      paths already use `confirm()`; the Base UI upgrade path is noted at the
+      call site
+- [x] Implement folder delete UI — `confirm()`, and the copy says the pastes are
+      kept
+- [x] Add folder detail page — `dashboard/folders/[folderId]`
+- [x] Add folder paste list — `pastes.listByFolder`, live
+- [x] Add move-paste action — the folder `<select>` on the paste detail page,
+      one `pastes.update({ folderId })`
+- [x] Add remove-from-folder action — per row on the folder page, and "No
+      folder" in that same select
+- [x] Add folder filter to dashboard — already built in Milestone 7; it now has
+      folders to filter by
+- [x] Ensure folder ownership is validated — `requireOwner` /
+      `requireOwnFolder` inside Convex, from the caller's own identity
+- [x] Prevent cross-account folder assignment — `pastes.update` and
+      `pastes.create` both resolve the folder against the paste owner
+- [x] Keep pastes when a folder is deleted — `folders.remove` schedules a
+      batched detach; the pastes and their public URLs are untouched
+- [x] Add realtime folder updates — every folder view is a `useQuery`
+      subscription
+- [x] Add folder operation tests — `convex/folders.test.ts` for the domain and
+      the authorization cases, `e2e/folders.spec.ts` for the workflow
 
 ## Milestone Acceptance Criteria
 
-- [ ] Users can create, rename, and delete folders
-- [ ] Pastes can be moved between folders
-- [ ] Deleting a folder preserves its pastes
-- [ ] Folder changes update in realtime
+- [x] Users can create, rename, and delete folders
+- [x] Pastes can be moved between folders
+- [x] Deleting a folder preserves its pastes
+- [x] Folder changes update in realtime — the rename in `e2e/folders.spec.ts`
+      repaints the list without a reload
 
 ---
 
@@ -1571,7 +1588,7 @@ The rebuild is considered complete when all launch-critical milestones are compl
 - [ ] Wildcard paste URLs work
 - [ ] Raw paste URLs work
 - [ ] Preview routes work
-- [ ] Folder management works
+- [x] Folder management works
 - [ ] Password protection works
 - [ ] API keys work
 - [ ] REST API publishing works

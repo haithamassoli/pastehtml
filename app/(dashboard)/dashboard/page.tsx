@@ -84,8 +84,7 @@ function PasteList() {
           aria-label="Search pastes"
           className="border-border focus-visible:border-ring focus-visible:ring-ring/50 h-8 flex-1 rounded-lg border px-2.5 text-sm outline-none focus-visible:ring-3"
         />
-        {/* Folders can only be created from Milestone 8's UI, so this stays out
-            of the way until the account actually has some. */}
+        {/* Stays out of the way until the account actually has a folder. */}
         {folders && folders.length > 0 && (
           <select
             value={folder}

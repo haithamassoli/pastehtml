@@ -23,11 +23,17 @@ export default async function DashboardLayout({
           New paste
         </Link>
       </div>
-      {/* One section until Milestone 8 adds folders. Scrolls rather than wraps
-          on a narrow screen, which is the whole of the mobile navigation. */}
+      {/* Scrolls rather than wraps on a narrow screen, which is the whole of
+          the mobile navigation. */}
       <nav className="border-border flex gap-4 overflow-x-auto border-b pb-2 text-sm">
         <Link href="/dashboard" className="font-medium whitespace-nowrap">
           Pastes
+        </Link>
+        <Link
+          href="/dashboard/folders"
+          className="font-medium whitespace-nowrap"
+        >
+          Folders
         </Link>
       </nav>
       {children}

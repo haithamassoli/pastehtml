@@ -197,6 +197,8 @@ function PasteDetail({ token }: { token: string }) {
 
       {folders && folders.length > 0 && (
         <Section title="Folder">
+          {/* Moving a paste in or out of a folder is one mutation; `null`
+              removes it. Hidden until the account has somewhere to file it. */}
           <select
             value={paste.folderId ?? ""}
             disabled={busy}
