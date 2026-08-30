@@ -8,6 +8,14 @@ import { convex } from "@/lib/paste-http";
 import { pasteUrls } from "@/lib/urls";
 import { OwnerControls } from "./owner-controls";
 
+// Rendered per request, so Next answers it `private, no-cache, no-store`. It
+// already was — every route in this app is dynamic because `ClerkProvider` in
+// the root layout reads the request — but inheriting that would be inheriting
+// it from somebody else's implementation detail. A page Next decides it may
+// prerender is cached for a year (`s-maxage=31536000`), which for paste
+// metadata means a deleted paste still described long after it is gone.
+export const dynamic = "force-dynamic";
+
 const fetchPaste = async (token: string) =>
   await convex.query(api.pastes.getByToken, { token });
 

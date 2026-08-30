@@ -26,11 +26,13 @@ import { route, toAppError, type ApiCredentials } from "@/lib/api";
 import { config } from "@/lib/config";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
+import { captureException } from "@/lib/sentry";
 import { convex } from "@/lib/paste-http";
 import { publishHtml, replaceHtml } from "@/lib/upload";
 import { pasteUrls } from "@/lib/urls";
 
-type Log = ReturnType<typeof logger.child>;
+/** The per-request logger and the id it is bound to, threaded into every tool. */
+type Ctx = { log: ReturnType<typeof logger.child>; requestId: string };
 
 /** What the client reads before it decides which tool to call. */
 const INSTRUCTIONS = `Publish HTML to ${config.rootDomain} and manage what you published.
@@ -92,7 +94,7 @@ const text = (value: unknown) => ({
  * credential, never the paste body an argument might carry.
  */
 async function run<T extends Record<string, unknown>>(
-  log: Log,
+  { log, requestId }: Ctx,
   tool: string,
   operation: () => Promise<T>,
 ) {
@@ -103,9 +105,12 @@ async function run<T extends Record<string, unknown>>(
   } catch (cause) {
     const error = toAppError(cause);
     // 5xx is ours to fix, so it carries the original; 4xx is the caller's.
-    if (error.status >= 500)
+    if (error.status >= 500) {
       log.error("mcp tool failed", { tool, code: error.code, cause });
-    else log.info("mcp tool rejected", { tool, code: error.code });
+      // A tool failure is answered as `isError`, never thrown, so Next's
+      // `onRequestError` never sees it. Report it the way `lib/api.ts` does.
+      captureException(cause, { tool, surface: "mcp", requestId });
+    } else log.info("mcp tool rejected", { tool, code: error.code });
     return {
       content: [text({ error: { code: error.code, message: error.message } })],
       isError: true,
@@ -115,7 +120,7 @@ async function run<T extends Record<string, unknown>>(
 
 /** A fresh server per request, with the caller's credentials closed over. */
 function mcpServer(credentials: ApiCredentials, requestId: string) {
-  const log = logger.child({ requestId });
+  const ctx = { log: logger.child({ requestId }), requestId };
   const server = new McpServer(
     // Version tracks the tool surface, which is versioned with the REST API it
     // delegates to: a breaking change here ships as `/mcp/v2` alongside this.
@@ -165,7 +170,7 @@ function mcpServer(credentials: ApiCredentials, requestId: string) {
       annotations: { readOnlyHint: false, openWorldHint: true },
     },
     async (args) =>
-      run(log, "create_paste", async () => {
+      run(ctx, "create_paste", async () => {
         const file = new File([args.html], args.filename ?? "index.html", {
           type: "text/html",
         });
@@ -195,7 +200,7 @@ function mcpServer(credentials: ApiCredentials, requestId: string) {
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async ({ token }) =>
-      run(log, "get_paste", async () => {
+      run(ctx, "get_paste", async () => {
         // The owner view is a superset, so try it first and fall back rather
         // than asking twice. Convex decides ownership; a key that does not own
         // this paste simply gets the public shape.
@@ -243,7 +248,7 @@ function mcpServer(credentials: ApiCredentials, requestId: string) {
       annotations: { readOnlyHint: false, openWorldHint: true },
     },
     async ({ token, updateToken, html, subdomain, folderId, ...rest }) =>
-      run(log, "update_paste", async () => {
+      run(ctx, "update_paste", async () => {
         const authorization = {
           apiKey: credentials.apiKey,
           updateToken: updateToken ?? credentials.updateToken,
@@ -292,7 +297,7 @@ function mcpServer(credentials: ApiCredentials, requestId: string) {
       },
     },
     async ({ token, updateToken }) =>
-      run(log, "delete_paste", async () => {
+      run(ctx, "delete_paste", async () => {
         await convex.mutation(api.pastes.remove, {
           token,
           apiKey: credentials.apiKey,
@@ -315,7 +320,7 @@ function mcpServer(credentials: ApiCredentials, requestId: string) {
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async ({ limit }) =>
-      run(log, "list_pastes", async () => {
+      run(ctx, "list_pastes", async () => {
         const pastes = await convex.query(api.pastes.listByOwner, {
           limit,
           apiKey: credentials.apiKey,

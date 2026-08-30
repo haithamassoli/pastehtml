@@ -62,6 +62,12 @@ const CSP = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // Emitted only when error tracking is on, because Sentry symbolicates browser
+  // stacks by fetching these from the deployment itself — nothing is uploaded,
+  // which is the entire reason `lib/sentry.ts` needs no build plugin. They are
+  // publicly readable once served, so an unconfigured deploy does not ship them.
+  productionBrowserSourceMaps: Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN),
+
   async headers() {
     return [
       {

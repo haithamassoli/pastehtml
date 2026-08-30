@@ -5,6 +5,13 @@ import { buttonVariants } from "@/components/ui/button";
 
 // Dashboard shell — signed-in area. Auth is enforced here so every nested
 // route inherits the guard.
+//
+// It also settles the cache policy for everything under it: `auth()` reads the
+// request, which makes this layout and every page beneath it dynamic, and Next
+// answers a dynamic render `private, no-cache, no-store, max-age=0,
+// must-revalidate`. Nothing to configure — one user's pastes must never be
+// served to another, and the guard that enforces that is the same fact that
+// stops the response being stored.
 export default async function DashboardLayout({
   children,
 }: {

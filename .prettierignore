@@ -3,3 +3,7 @@ node_modules
 convex/_generated
 package-lock.json
 *.woff2
+
+# Legacy compatibility fixtures are compared byte for byte; reformatting one
+# would change what the tests assert against.
+test/fixtures/legacy/*.html

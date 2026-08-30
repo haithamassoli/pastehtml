@@ -25,10 +25,26 @@ export const SECURITY_HEADERS = {
   "Referrer-Policy": "no-referrer",
 } as const;
 
-// ponytail: revalidate on every request so an update or delete is visible
-// immediately; conditional requests keep it to a 304. Milestone 16 tunes this.
+// The cache policy for every surface that hands over stored bytes, and it is
+// deliberately not a TTL. A paste can be replaced, taken down for abuse or
+// deleted at any moment, and all three have to be visible on the next request
+// rather than whenever a stored copy expires — so nothing is stored, everything
+// revalidates, and the ETag is what makes that cheap: a conditional request is
+// answered by one indexed Convex read and never touches File Storage. Measured,
+// locally: ~230ms for a full read against ~106ms for the 304 (docs/load-testing.md).
 export const CACHE_CONTROL = "public, max-age=0, must-revalidate";
 
+// The same policy for a paste behind a password. Correct revalidation would
+// gate a shared cache's copy anyway — the unlocked and locked answers differ —
+// but bytes only an unlocked visitor may see should not sit in a cache nobody
+// here controls, and `private` is the one word that says so.
+export const PRIVATE_CACHE_CONTROL = "private, max-age=0, must-revalidate";
+
+/**
+ * Every answer that is not the paste itself: not found, withheld, disabled,
+ * unreachable. `no-store` on all of them, so a takedown or a delete can never
+ * be contradicted by something a cache kept.
+ */
 export function plain(status: number, message: string) {
   return new Response(message, {
     status,
@@ -80,8 +96,10 @@ export async function resolvePaste(
 
 /**
  * Streams the stored bytes through verbatim under the caller's headers. The
- * ETag is Convex's stored SHA-256 digest, so a conditional request is answered
- * without ever reading storage.
+ * ETag is Convex's stored SHA-256 digest — computed by File Storage when the
+ * bytes landed and re-read on every resolve, so replacing a paste's content
+ * changes the digest, and with it the ETag, with nothing to keep in sync.
+ * A conditional request is therefore answered without ever reading storage.
  */
 export async function serveStored(
   request: Request,
@@ -91,7 +109,8 @@ export async function serveStored(
   const etag = `"${paste.sha256}"`;
   const responseHeaders = {
     ...SECURITY_HEADERS,
-    "Cache-Control": CACHE_CONTROL,
+    "Cache-Control":
+      paste.visibility === "protected" ? PRIVATE_CACHE_CONTROL : CACHE_CONTROL,
     ETag: etag,
     ...headers,
   };

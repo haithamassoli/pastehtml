@@ -41,6 +41,13 @@ export default defineSchema({
     ownerId: v.optional(v.string()),
     folderId: v.optional(v.id("folders")),
 
+    // ponytail: no `contentHash` column. Convex's `_storage` row already holds
+    // a SHA-256 that File Storage computed from the bytes themselves, and
+    // `resolveForRuntime` reads it in the same query as this row to use as the
+    // ETag — a copy here would be a second thing to keep true, updated by hand
+    // on every replacement, and the storage digest would still be the one that
+    // could not be wrong. Worth adding only if something needs the hash without
+    // resolving the paste at all.
     storageId: v.id("_storage"),
 
     filename: v.string(),

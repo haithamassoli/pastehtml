@@ -60,6 +60,24 @@ beforeEach(() => {
 });
 
 describe("paste runtime", () => {
+  it("revalidates on every request rather than letting a copy be stored", async () => {
+    const response = await get();
+
+    expect(response.headers.get("Cache-Control")).toBe(
+      "public, max-age=0, must-revalidate",
+    );
+  });
+
+  it("keeps a disabled paste out of every cache", async () => {
+    query.mockResolvedValue({ ...PASTE, disabled: true, url: null });
+
+    const response = await get();
+
+    expect(response.status).toBe(410);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("serves the stored HTML verbatim with its own content type", async () => {
     const response = await get();
 
@@ -168,6 +186,11 @@ describe("paste runtime", () => {
     const response = await get({ cookie: "ph_unlock=session-secret" });
 
     expect(response.status).toBe(200);
+    // Unlocked bytes belong to this visitor's browser cache, not to a shared
+    // one that would hold them for whoever asks next.
+    expect(response.headers.get("Cache-Control")).toBe(
+      "private, max-age=0, must-revalidate",
+    );
     // The cookie is what the query is asked to validate — never trusted here.
     expect(query).toHaveBeenCalledWith(expect.anything(), {
       subdomain: "abc123def456",

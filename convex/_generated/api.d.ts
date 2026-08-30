@@ -18,6 +18,7 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as lib_password from "../lib/password.js";
 import type * as lib_tokens from "../lib/tokens.js";
 import type * as lib_validation from "../lib/validation.js";
+import type * as migrate from "../migrate.js";
 import type * as pastes from "../pastes.js";
 import type * as rateLimit from "../rateLimit.js";
 import type * as storage from "../storage.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   "lib/password": typeof lib_password;
   "lib/tokens": typeof lib_tokens;
   "lib/validation": typeof lib_validation;
+  migrate: typeof migrate;
   pastes: typeof pastes;
   rateLimit: typeof rateLimit;
   storage: typeof storage;

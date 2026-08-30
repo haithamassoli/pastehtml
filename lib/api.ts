@@ -9,6 +9,7 @@ import { API_KEY_PREFIX } from "@/convex/lib/apiKeys";
 import { AppError, ErrorCode } from "./errors";
 import { logger } from "./logger";
 import { REQUEST_ID_HEADER, requestId } from "./request-id";
+import { captureException } from "./sentry";
 import { convex } from "./paste-http";
 import { config } from "./config";
 
@@ -134,7 +135,11 @@ export function route<C = unknown>(
   return async (request: Request, context: C): Promise<Response> => {
     const id = requestId(request);
     const credentials = credentialsFrom(request);
-    const log = logger.child({ requestId: id, method: request.method });
+    // Method and path are the operation: which paste, which verb. They are also
+    // the whole record of it — the body of a create or a replace *is* the HTML,
+    // and it never goes near a log line.
+    const path = new URL(request.url).pathname;
+    const log = logger.child({ requestId: id, method: request.method, path });
 
     try {
       if (bucket === "api:write") requireSameOrigin(request, credentials);
@@ -170,9 +175,16 @@ export function route<C = unknown>(
     } catch (cause) {
       const error = toAppError(cause);
       // 5xx is ours to fix, so it carries the original; 4xx is the caller's.
-      if (error.status >= 500)
+      if (error.status >= 500) {
         log.error("api failed", { code: error.code, cause });
-      else log.info("api rejected", { code: error.code });
+        // `route` answers with the error envelope rather than throwing, so
+        // Next's `onRequestError` never sees this one. Report it here instead.
+        captureException(cause, {
+          requestId: id,
+          method: request.method,
+          path,
+        });
+      } else log.info("api rejected", { code: error.code });
       return errorResponse(error, id);
     }
   };

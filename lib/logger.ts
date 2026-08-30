@@ -5,17 +5,44 @@
 type Level = "debug" | "info" | "warn" | "error";
 type Fields = Record<string, unknown>;
 
-const REDACT = /(password|token|secret|apikey|api_key|authorization|cookie)/i;
+// Matched against field *names*. Every credential this codebase holds is named
+// after one of these: `apiKey`, `updateToken`, `unlockToken`, `password`,
+// `Authorization`, `Cookie`. `hash` covers `passwordHash` and `keyHash` — a
+// digest is not a secret, but it is what a leaked log would be attacked with,
+// and nothing benign here is named for one (the paste digest is `sha256`).
+const REDACT =
+  /(password|token|secret|apikey|api_key|authorization|cookie|hash)/i;
+
+// The one credential that also travels inside strings, where no field name
+// gives it away: an API key pasted into an error message, a URL or a stack.
+const API_KEY = /\bph_[A-Za-z0-9_-]{6,}/g;
+
+function scrub(text: string): string {
+  return text.replace(API_KEY, "ph_[REDACTED]");
+}
 
 function redact(fields: Fields): Fields {
   const out: Fields = {};
-  for (const [k, v] of Object.entries(fields)) {
-    if (REDACT.test(k)) out[k] = "[REDACTED]";
-    else if (v && typeof v === "object" && !Array.isArray(v)) {
-      out[k] = redact(v as Fields);
-    } else out[k] = v;
-  }
+  for (const [k, v] of Object.entries(fields))
+    out[k] = REDACT.test(k) ? "[REDACTED]" : clean(v);
   return out;
+}
+
+function clean(value: unknown): unknown {
+  if (typeof value === "string") return scrub(value);
+  // `message` and `stack` are non-enumerable, so an Error walked as a plain
+  // object serializes to `{}` — losing exactly the thing we log it for. The
+  // spread keeps whatever else was attached (a `ConvexError`'s `data`).
+  if (value instanceof Error)
+    return {
+      name: value.name,
+      message: scrub(value.message),
+      stack: value.stack && scrub(value.stack),
+      ...redact({ ...value }),
+    };
+  if (Array.isArray(value)) return value.map(clean);
+  if (value && typeof value === "object") return redact(value as Fields);
+  return value;
 }
 
 function emit(level: Level, msg: string, fields: Fields = {}) {
@@ -42,4 +69,4 @@ export const logger = {
   }),
 };
 
-export { redact as _redactForTest };
+export { redact, redact as _redactForTest };

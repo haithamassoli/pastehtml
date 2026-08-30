@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Inline JavaScript</title>
+<script type="text/javascript">
+  // A legacy paste computes its own body, and the < in this comparison must
+  // survive: an HTML-aware rewriter would be tempted to escape it.
+  var lucky = [];
+  for (var i = 0; i < 5; i++) { lucky.push(i * 2); }
+  function greet(name) { return "hello, " + name + " <" + lucky.join(",") + ">"; }
+</script>
+</head>
+<body onload="document.getElementById('out').innerHTML = greet('world')">
+<p id="out">no script ran</p>
+<button onclick="alert('clicked')">click me</button>
+<script>document.write("<p id='written'>written by document.write</p>");</script>
+</body>
+</html>

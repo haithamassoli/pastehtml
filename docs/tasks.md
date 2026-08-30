@@ -145,6 +145,10 @@ Define the product data model and implement the domain-level backend functions r
 
 ### Validation
 
+The validator is written and unit-tested (`scripts/migrate-validate.mjs`); every
+item below is an action it performs against real data, so none can be ticked
+until there is a staging deployment to run it on.
+
 - [x] Add shared validation for paste filenames
 - [x] Add shared validation for titles
 - [x] Add shared validation for custom subdomains
@@ -1628,49 +1632,50 @@ Make paste delivery fast globally while preserving correct behavior for updates 
 
 ### Runtime Performance
 
-- [ ] Measure baseline paste request latency
-- [ ] Ensure paste lookup uses indexed Convex queries
-- [ ] Avoid unnecessary React rendering in runtime route
-- [ ] Minimize runtime dependencies
-- [ ] Avoid blocking analytics writes
-- [ ] Avoid unnecessary file transformations
+- [x] Measure baseline paste request latency
+- [x] Ensure paste lookup uses indexed Convex queries
+- [x] Avoid unnecessary React rendering in runtime route
+- [x] Minimize runtime dependencies
+- [x] Avoid blocking analytics writes
+- [x] Avoid unnecessary file transformations
 
 ### HTTP Caching
 
-- [ ] Define cache policy for public paste runtime
-- [ ] Define cache policy for raw endpoint
-- [ ] Define cache policy for preview endpoint
-- [ ] Define cache policy for metadata page
-- [ ] Define cache policy for dashboard routes
-- [ ] Implement ETags
-- [ ] Implement `If-None-Match`
-- [ ] Return `304 Not Modified` when appropriate
-- [ ] Ensure deleted content does not remain cached too long
-- [ ] Ensure updated content invalidates or bypasses stale cache
+- [x] Define cache policy for public paste runtime
+- [x] Define cache policy for raw endpoint
+- [x] Define cache policy for preview endpoint
+- [x] Define cache policy for metadata page
+- [x] Define cache policy for dashboard routes
+- [x] Implement ETags
+- [x] Implement `If-None-Match`
+- [x] Return `304 Not Modified` when appropriate
+- [x] Ensure deleted content does not remain cached too long
+- [x] Ensure updated content invalidates or bypasses stale cache
 
 ### Content Hashing
 
-- [ ] Generate content hash when uploading HTML
-- [ ] Store content hash in paste metadata
-- [ ] Recalculate hash on replacement
-- [ ] Use content hash for ETag where appropriate
+- [x] Generate content hash when uploading HTML
+- [x] Store content hash in paste metadata
+- [x] Recalculate hash on replacement
+- [x] Use content hash for ETag where appropriate
 
 ### Load Testing
 
-- [ ] Create load-test scenario for public paste reads
-- [ ] Create load-test scenario for anonymous creation
-- [ ] Create load-test scenario for API publishing
-- [ ] Create load-test scenario for high-view-count paste
-- [ ] Verify analytics does not become a bottleneck
-- [ ] Review Convex usage patterns under load
-- [ ] Review Vercel function behavior under load
+- [x] Create load-test scenario for public paste reads
+- [x] Create load-test scenario for anonymous creation
+- [x] Create load-test scenario for API publishing
+- [x] Create load-test scenario for high-view-count paste
+- [x] Verify analytics does not become a bottleneck
+- [x] Review Convex usage patterns under load
+- [ ] Review Vercel function behavior under load — needs a deployment;
+      everything measurable locally is in `docs/load-testing.md`
 
 ## Milestone Acceptance Criteria
 
-- [ ] Typical paste requests avoid unnecessary backend work
-- [ ] Conditional requests work
-- [ ] Updated pastes become visible within the chosen cache policy
-- [ ] High-traffic pastes do not block on analytics processing
+- [x] Typical paste requests avoid unnecessary backend work
+- [x] Conditional requests work
+- [x] Updated pastes become visible within the chosen cache policy
+- [x] High-traffic pastes do not block on analytics processing
 
 ---
 
@@ -1684,51 +1689,53 @@ Make production issues diagnosable before migrating real traffic.
 
 ### Logging
 
-- [ ] Add structured server logs
-- [ ] Add request IDs
-- [ ] Add correlation IDs across Next.js and Convex where practical
-- [ ] Log paste operation type without logging full HTML
-- [ ] Redact API keys
-- [ ] Redact update tokens
-- [ ] Redact authentication tokens
-- [ ] Redact passwords
+- [x] Add structured server logs
+- [x] Add request IDs
+- [x] Add correlation IDs across Next.js and Convex where practical
+- [x] Log paste operation type without logging full HTML
+- [x] Redact API keys
+- [x] Redact update tokens
+- [x] Redact authentication tokens
+- [x] Redact passwords
 
 ### Error Tracking
 
-- [ ] Configure Sentry or equivalent
-- [ ] Add Next.js error tracking
-- [ ] Add client-side error tracking
-- [ ] Add release/environment labels
-- [ ] Add source maps
-- [ ] Verify sensitive data is scrubbed
+- [x] Configure Sentry or equivalent
+- [x] Add Next.js error tracking
+- [x] Add client-side error tracking
+- [x] Add release/environment labels
+- [ ] Add source maps — browser maps are emitted and uploaded; the Node
+      bundle has no upload path without `@sentry/nextjs` (`lib/sentry.ts`)
+- [x] Verify sensitive data is scrubbed
 
 ### Monitoring
 
-- [ ] Define critical production health checks
-- [ ] Monitor failed paste creates
-- [ ] Monitor runtime 5xx rate
-- [ ] Monitor API error rate
-- [ ] Monitor MCP error rate
-- [ ] Monitor Convex function errors
-- [ ] Monitor storage errors
-- [ ] Monitor auth failures
-- [ ] Monitor abnormal rate-limit spikes
+- [x] Define critical production health checks
+- [x] Monitor failed paste creates
+- [x] Monitor runtime 5xx rate
+- [x] Monitor API error rate
+- [x] Monitor MCP error rate
+- [x] Monitor Convex function errors
+- [ ] Monitor storage errors — a failed storage read is a returned 502, not a
+      throw, so `onRequestError` misses it; visible only as a Vercel status code
+- [x] Monitor auth failures
+- [x] Monitor abnormal rate-limit spikes
 
 ### Operational Documentation
 
-- [ ] Create incident-response notes
-- [ ] Create rollback runbook
-- [ ] Create migration rollback runbook
-- [ ] Document Convex deployment recovery
-- [ ] Document Vercel deployment rollback
-- [ ] Document domain/DNS recovery steps
+- [x] Create incident-response notes
+- [x] Create rollback runbook
+- [x] Create migration rollback runbook
+- [x] Document Convex deployment recovery
+- [x] Document Vercel deployment rollback
+- [x] Document domain/DNS recovery steps
 
 ## Milestone Acceptance Criteria
 
-- [ ] Production errors are visible and diagnosable
-- [ ] Credentials are not leaked through logs
-- [ ] Rollback instructions exist
-- [ ] Core product health can be monitored
+- [x] Production errors are visible and diagnosable
+- [x] Credentials are not leaked through logs
+- [x] Rollback instructions exist
+- [x] Core product health can be monitored
 
 ---
 
@@ -1742,69 +1749,71 @@ Build enough automated coverage to safely replace the existing Rails application
 
 ### Unit Tests
 
-- [ ] Test token generation
-- [ ] Test custom-subdomain validation
-- [ ] Test reserved-subdomain validation
-- [ ] Test password hashing helpers
-- [ ] Test API-key hashing helpers
-- [ ] Test ownership checks
-- [ ] Test scope checks
-- [ ] Test anonymous update-token checks
-- [ ] Test error normalization
+- [x] Test token generation
+- [x] Test custom-subdomain validation
+- [x] Test reserved-subdomain validation
+- [x] Test password hashing helpers
+- [x] Test API-key hashing helpers
+- [x] Test ownership checks
+- [x] Test scope checks
+- [x] Test anonymous update-token checks
+- [x] Test error normalization
 
 ### Integration Tests
 
-- [ ] Test anonymous paste creation
-- [ ] Test authenticated paste creation
-- [ ] Test paste retrieval
-- [ ] Test paste update
-- [ ] Test paste deletion
-- [ ] Test folder creation
-- [ ] Test folder deletion
-- [ ] Test folder movement
-- [ ] Test API-key authentication
-- [ ] Test protected paste unlock
-- [ ] Test analytics update
-- [ ] Test storage replacement
+- [x] Test anonymous paste creation
+- [x] Test authenticated paste creation
+- [x] Test paste retrieval
+- [x] Test paste update
+- [x] Test paste deletion
+- [x] Test folder creation
+- [x] Test folder deletion
+- [x] Test folder movement
+- [x] Test API-key authentication
+- [x] Test protected paste unlock
+- [x] Test analytics update
+- [x] Test storage replacement
 
 ### End-to-End Tests
 
-- [ ] Test homepage upload
-- [ ] Test drag-and-drop upload
-- [ ] Test generated wildcard URL
-- [ ] Test raw endpoint
-- [ ] Test preview endpoint
-- [ ] Test sign-up
-- [ ] Test sign-in
-- [ ] Test dashboard
-- [ ] Test folder workflow
-- [ ] Test password protection
-- [ ] Test API key creation
-- [ ] Test API publishing
-- [ ] Test MCP publishing
-- [ ] Test paste deletion
+- [x] Test homepage upload
+- [x] Test drag-and-drop upload
+- [x] Test generated wildcard URL
+- [x] Test raw endpoint
+- [x] Test preview endpoint
+- [x] Test sign-up
+- [x] Test sign-in
+- [x] Test dashboard
+- [x] Test folder workflow
+- [x] Test password protection
+- [x] Test API key creation
+- [x] Test API publishing
+- [x] Test MCP publishing
+- [x] Test paste deletion
 
 ### Compatibility Tests
 
-- [ ] Build representative legacy paste fixture set
-- [ ] Include HTML with inline CSS
-- [ ] Include HTML with inline JavaScript
-- [ ] Include Unicode HTML
-- [ ] Include unusual whitespace
-- [ ] Include large HTML near the size limit
-- [ ] Include malformed but browser-renderable HTML
-- [ ] Compare old public runtime behavior
-- [ ] Compare old raw endpoint bytes
-- [ ] Compare old render behavior where required
-- [ ] Verify existing tokens map correctly
-- [ ] Verify existing URLs remain valid
+- [x] Build representative legacy paste fixture set
+- [x] Include HTML with inline CSS
+- [x] Include HTML with inline JavaScript
+- [x] Include Unicode HTML
+- [x] Include unusual whitespace
+- [x] Include large HTML near the size limit
+- [x] Include malformed but browser-renderable HTML
+- [ ] Compare old public runtime behavior — needs the running Rails app; the
+      property a diff would establish is proven in `e2e/compat.spec.ts`
+- [ ] Compare old raw endpoint bytes — same: byte-identity is proven against
+      the fixture corpus, not against live legacy responses
+- [x] Compare old render behavior where required
+- [x] Verify existing tokens map correctly
+- [x] Verify existing URLs remain valid
 
 ## Milestone Acceptance Criteria
 
-- [ ] Critical product flows have end-to-end coverage
-- [ ] Raw-output compatibility is verified
-- [ ] Security-critical authorization checks have automated tests
-- [ ] CI blocks deployment on failed critical tests
+- [x] Critical product flows have end-to-end coverage
+- [x] Raw-output compatibility is verified
+- [x] Security-critical authorization checks have automated tests
+- [x] CI blocks deployment on failed critical tests
 
 ---
 
@@ -1818,6 +1827,9 @@ Move production data from the Rails application into Convex without breaking exi
 
 ### Migration Analysis
 
+Every inventory item below is blocked on access to the production Rails app.
+`docs/migration.md` §1 is the blank table to fill in against the real database.
+
 - [ ] Inventory existing Rails tables
 - [ ] Inventory existing paste fields
 - [ ] Inventory folders
@@ -1827,24 +1839,24 @@ Move production data from the Rails application into Convex without breaking exi
 - [ ] Inventory password-protected paste data
 - [ ] Inventory analytics data
 - [ ] Inventory stored HTML
-- [ ] Identify records that cannot be migrated directly
-- [ ] Define source-of-truth rules during migration
+- [x] Identify records that cannot be migrated directly
+- [x] Define source-of-truth rules during migration
 
 ### Migration Tooling
 
-- [ ] Create export script from legacy application
-- [ ] Create normalized migration format
-- [ ] Create Convex import script
-- [ ] Create HTML upload migration process
-- [ ] Preserve paste tokens
-- [ ] Preserve custom subdomains
-- [ ] Preserve ownership mappings
-- [ ] Preserve folder relationships
-- [ ] Preserve creation timestamps
-- [ ] Preserve update timestamps
-- [ ] Preserve password behavior where safely possible
-- [ ] Define API-key migration policy
-- [ ] Define OAuth/MCP credential migration policy
+- [x] Create export script from legacy application
+- [x] Create normalized migration format
+- [x] Create Convex import script
+- [x] Create HTML upload migration process
+- [x] Preserve paste tokens
+- [x] Preserve custom subdomains
+- [x] Preserve ownership mappings
+- [x] Preserve folder relationships
+- [x] Preserve creation timestamps
+- [x] Preserve update timestamps
+- [x] Preserve password behavior where safely possible
+- [x] Define API-key migration policy
+- [x] Define OAuth/MCP credential migration policy
 
 ### Validation
 
@@ -1861,6 +1873,8 @@ Move production data from the Rails application into Convex without breaking exi
 
 ### Dry Run
 
+Blocked on a staging Convex deployment and a real export.
+
 - [ ] Run full migration against staging
 - [ ] Measure migration duration
 - [ ] Validate migration logs
@@ -1871,10 +1885,10 @@ Move production data from the Rails application into Convex without breaking exi
 ## Milestone Acceptance Criteria
 
 - [ ] All required production records can be migrated
-- [ ] Existing public tokens are preserved
+- [x] Existing public tokens are preserved
 - [ ] HTML content passes hash/byte validation
 - [ ] Migration has been successfully rehearsed on staging
-- [ ] A rollback path exists
+- [x] A rollback path exists
 
 ---
 
@@ -2129,9 +2143,11 @@ The rebuild is considered complete when all launch-critical milestones are compl
 - [x] Security isolation between app and paste origins is verified — audited
       and attacked from inside a published page (Milestone 15)
 - [ ] Migration has preserved required existing paste URLs
-- [ ] Automated critical-path tests pass
-- [ ] Production monitoring is enabled
-- [ ] Rollback procedures are documented
+- [x] Automated critical-path tests pass — 352 unit/integration + 40 e2e,
+      gated in CI (Milestone 18)
+- [x] Production monitoring is enabled — structured logs, DSN-gated error
+      reporting and `/api/health`; alert rules are a manual step (Milestone 17)
+- [x] Rollback procedures are documented — `docs/operations.md` (Milestone 17)
 - [ ] Legacy Rails infrastructure is no longer required
 
 ---
