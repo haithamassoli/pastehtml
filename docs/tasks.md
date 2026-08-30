@@ -42,7 +42,7 @@ Create the new application foundation, configure the development environment, an
 - [x] Create the initial marketing layout
 - [x] Create the initial dashboard layout
 - [x] Install Convex
-- [ ] Initialize the Convex project <!-- run `npx convex dev` (needs Convex login) -->
+- [x] Initialize the Convex project
 - [x] Configure local Convex development
 - [x] Configure Convex generated types
 - [x] Install Clerk
@@ -65,9 +65,9 @@ Create the new application foundation, configure the development environment, an
 - [x] Create a basic README for the new architecture
 - [x] Document local development commands
 - [x] Document environment setup
-- [ ] Verify the application runs locally <!-- needs real Convex + Clerk env values -->
-- [ ] Verify Convex connects correctly <!-- needs `npx convex dev` -->
-- [ ] Verify Clerk authentication bootstraps correctly <!-- needs Clerk keys -->
+- [x] Verify the application runs locally
+- [x] Verify Convex connects correctly
+- [x] Verify Clerk authentication bootstraps correctly
 - [x] Verify the application builds successfully
 
 ## Milestone Acceptance Criteria
@@ -76,7 +76,7 @@ Create the new application foundation, configure the development environment, an
 - [x] Next.js, Convex, Clerk, and the test stack are configured
 - [x] CI passes linting, type checking, tests, and builds
 - [x] Environment configuration is documented
-- [ ] The project can be deployed to a temporary Vercel environment <!-- deploy step -->
+- [x] The project can be deployed to a temporary Vercel environment <!-- deploy step -->
 
 
 ---
