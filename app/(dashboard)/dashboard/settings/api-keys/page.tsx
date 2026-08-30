@@ -10,6 +10,7 @@ import {
 import { api } from "@/convex/_generated/api";
 import { SCOPES, type Scope } from "@/convex/schema";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/paste-fields";
 import { CopyButton } from "@/components/copy-button";
 import { errorMessage } from "@/lib/errors";
 
@@ -219,16 +220,6 @@ function ApiKeyList() {
           })}
         </ul>
       )}
-    </div>
-  );
-}
-
-function Skeleton() {
-  return (
-    <div aria-busy="true" className="flex flex-col gap-3">
-      {[0, 1].map((row) => (
-        <div key={row} className="bg-muted h-16 animate-pulse rounded-lg" />
-      ))}
     </div>
   );
 }

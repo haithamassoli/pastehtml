@@ -12,9 +12,9 @@ import {
 } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { CopyButton } from "@/components/copy-button";
 import { CustomSubdomain } from "./custom-subdomain";
 import { Button } from "@/components/ui/button";
+import { Fact, Skeleton, UrlRow, sizeLabel } from "@/components/paste-fields";
 import { errorMessage } from "@/lib/errors";
 import { displayName, isoDate } from "@/lib/paste-list";
 import { replaceHtml } from "@/lib/upload";
@@ -28,10 +28,7 @@ export default function PasteDetailPage({
   return (
     <>
       <AuthLoading>
-        <div
-          aria-busy="true"
-          className="bg-muted h-64 animate-pulse rounded-lg"
-        />
+        <Skeleton rows={1} className="h-64" />
       </AuthLoading>
       <Authenticated>
         <PasteDetail token={token} />
@@ -136,10 +133,7 @@ function PasteDetail({ token }: { token: string }) {
 
       <dl className="text-muted-foreground grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
         <Fact label="Filename" value={paste.filename} />
-        <Fact
-          label="Size"
-          value={`${Math.ceil(paste.contentLength / 1024)} KB`}
-        />
+        <Fact label="Size" value={sizeLabel(paste.contentLength)} />
         <Fact label="Updated" value={isoDate(paste.updatedAt)} />
       </dl>
 
@@ -309,31 +303,5 @@ function Section({
       <h3 className="text-sm font-medium">{title}</h3>
       {children}
     </section>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col">
-      <dt className="text-xs tracking-wide uppercase">{label}</dt>
-      <dd className="text-foreground truncate font-medium">{value}</dd>
-    </div>
-  );
-}
-
-function UrlRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium">{label}</p>
-      <div className="border-border flex items-center gap-2 rounded-lg border p-2">
-        <a
-          href={value}
-          className="flex-1 truncate font-mono text-sm underline-offset-4 hover:underline"
-        >
-          {value}
-        </a>
-        <CopyButton value={value} />
-      </div>
-    </div>
   );
 }

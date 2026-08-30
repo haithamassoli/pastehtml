@@ -13,6 +13,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import { errorMessage } from "@/lib/errors";
+import { Skeleton } from "@/components/paste-fields";
 import { displayName, isoDate } from "@/lib/paste-list";
 import { pasteUrls } from "@/lib/urls";
 
@@ -23,10 +24,7 @@ export default function FolderDetailPage({
   return (
     <>
       <AuthLoading>
-        <div
-          aria-busy="true"
-          className="bg-muted h-40 animate-pulse rounded-lg"
-        />
+        <Skeleton rows={1} className="h-40" />
       </AuthLoading>
       <Authenticated>
         <FolderDetail folderId={folderId as Id<"folders">} />

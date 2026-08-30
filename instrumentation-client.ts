@@ -2,7 +2,7 @@
 // before hydration, so a crash in the first render is already covered.
 //
 // Two native events are the whole surface: React's own error boundaries handle
-// what they can (`app/(dashboard)/dashboard/error.tsx`), and everything that
+// what they can (`app/error.tsx`, `app/global-error.tsx`), and everything that
 // escapes one — an event handler, a failed fetch, a third-party script — lands
 // in exactly one of these. No-ops without a DSN, like the server half.
 import { captureException } from "@/lib/sentry";

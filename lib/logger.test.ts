@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { ConvexError } from "convex/values";
-import { _redactForTest as redact } from "./logger";
+import { redact } from "./logger";
 
 describe("redaction", () => {
   test("redacts sensitive top-level and nested fields", () => {

@@ -69,4 +69,4 @@ export const logger = {
   }),
 };
 
-export { redact, redact as _redactForTest };
+export { redact };

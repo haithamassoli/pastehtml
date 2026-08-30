@@ -10,6 +10,7 @@ import {
 } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/paste-fields";
 import { errorMessage } from "@/lib/errors";
 
 export default function FoldersPage() {
@@ -132,16 +133,6 @@ function FolderList() {
           ))}
         </ul>
       )}
-    </div>
-  );
-}
-
-function Skeleton() {
-  return (
-    <div aria-busy="true" className="flex flex-col gap-3">
-      {[0, 1].map((row) => (
-        <div key={row} className="bg-muted h-16 animate-pulse rounded-lg" />
-      ))}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
 import { api } from "@/convex/_generated/api";
 import { CopyButton } from "@/components/copy-button";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Skeleton } from "@/components/paste-fields";
 import { errorMessage } from "@/lib/errors";
 import {
   arrangePastes,
@@ -29,7 +30,7 @@ export default function DashboardPage() {
   return (
     <>
       <AuthLoading>
-        <Skeleton />
+        <Skeleton rows={3} className="h-20" />
       </AuthLoading>
       <Authenticated>
         <PasteList />
@@ -53,7 +54,7 @@ function PasteList() {
   const [sort, setSort] = useState<SortKey>("newest");
   const [error, setError] = useState<string | null>(null);
 
-  if (pastes === undefined) return <Skeleton />;
+  if (pastes === undefined) return <Skeleton rows={3} className="h-20" />;
   if (pastes.length === 0) return <Empty />;
 
   const folderId =
@@ -183,16 +184,6 @@ function Empty() {
       <Link href="/" className={buttonVariants({ size: "sm" })}>
         Publish HTML
       </Link>
-    </div>
-  );
-}
-
-function Skeleton() {
-  return (
-    <div aria-busy="true" className="flex flex-col gap-3">
-      {[0, 1, 2].map((row) => (
-        <div key={row} className="bg-muted h-20 animate-pulse rounded-lg" />
-      ))}
     </div>
   );
 }

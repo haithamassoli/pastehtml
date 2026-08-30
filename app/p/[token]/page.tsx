@@ -1,10 +1,11 @@
 // The public metadata page for a paste: what it is, and every URL it has.
 // Paste content is never rendered here — the app origin only ever links to it.
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { api } from "@/convex/_generated/api";
+import { Fact, UrlRow, sizeLabel } from "@/components/paste-fields";
 import { convex } from "@/lib/paste-http";
+import { isoDate } from "@/lib/paste-list";
 import { pasteUrls } from "@/lib/urls";
 import { OwnerControls } from "./owner-controls";
 
@@ -47,49 +48,18 @@ export default async function PastePage({ params }: PageProps<"/p/[token]">) {
 
       <dl className="text-muted-foreground grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
         <Fact label="Filename" value={paste.filename} />
-        <Fact
-          label="Size"
-          value={`${Math.ceil(paste.contentLength / 1024)} KB`}
-        />
+        <Fact label="Size" value={sizeLabel(paste.contentLength)} />
         <Fact label="Views" value={String(paste.viewsCount)} />
-        <Fact
-          label="Published"
-          value={new Date(paste.createdAt).toISOString().slice(0, 10)}
-        />
+        <Fact label="Published" value={isoDate(paste.createdAt)} />
       </dl>
 
       <div className="flex flex-col gap-4">
-        <UrlRow label="Public URL" href={urls.publicUrl} />
-        <UrlRow label="Raw URL" href={urls.rawUrl} />
-        <UrlRow label="Preview" href={urls.renderUrl} />
+        <UrlRow label="Public URL" value={urls.publicUrl} />
+        <UrlRow label="Raw URL" value={urls.rawUrl} />
+        <UrlRow label="Preview" value={urls.renderUrl} />
       </div>
 
       <OwnerControls token={paste.token} />
     </main>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col">
-      <dt className="text-xs tracking-wide uppercase">{label}</dt>
-      <dd className="text-foreground truncate font-medium">{value}</dd>
-    </div>
-  );
-}
-
-function UrlRow({ label, href }: { label: string; href: string }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium">{label}</p>
-      <div className="border-border rounded-lg border p-2">
-        <Link
-          href={href}
-          className="block truncate font-mono text-sm underline-offset-4 hover:underline"
-        >
-          {href}
-        </Link>
-      </div>
-    </div>
   );
 }
