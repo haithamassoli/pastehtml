@@ -434,47 +434,86 @@ Add production-ready user authentication while keeping wildcard paste origins is
 
 ### Clerk Setup
 
-- [ ] Configure Clerk production application
-- [ ] Configure allowed callback URLs
-- [ ] Configure sign-in page
-- [ ] Configure sign-up page
-- [ ] Configure sign-out flow
-- [ ] Configure desired OAuth providers
-- [ ] Configure email authentication if required
-- [ ] Configure Convex Clerk integration
-- [ ] Configure authentication state in server components
-- [ ] Configure authentication state in route handlers
+- [ ] Configure Clerk production application — **deferred to Milestone 20**. A
+      production instance needs `clerk.`/`accounts.`/`clkmail.` DNS records on
+      `assoli.site` and production keys in Vercel, which is exactly the work
+      Milestone 20 already owns. The development instance is fully configured.
+- [x] Configure allowed callback URLs — instance `paths` now point at the app
+      (`sign_in` `/sign-in`, `sign_up` `/sign-up`, `home` and
+      `after_sign_out_all` `/`); a development instance accepts any localhost
+      origin
+- [x] Configure sign-in page — `app/sign-in/[[...sign-in]]`
+- [x] Configure sign-up page — `app/sign-up/[[...sign-up]]`
+- [x] Configure sign-out flow — `afterSignOutUrl="/"` on `ClerkProvider`, driven
+      from `UserButton`
+- [x] Configure desired OAuth providers — Google enabled. Left as configured;
+      the provider set is PRD open question 5 and adding one is a single
+      `clerk config patch`.
+- [x] Configure email authentication if required — email + password, with
+      `email_code` for sign-in and sign-up verification
+- [x] Configure Convex Clerk integration — `convex/auth.config.ts` +
+      `CLERK_JWT_ISSUER_DOMAIN` on the deployment, `ConvexProviderWithClerk` on
+      the client, Clerk's `convex` JWT template
+- [x] Configure authentication state in server components — `auth()` in the
+      dashboard layout guard; `lib/auth.ts` `getCurrentUser` /
+      `requireCurrentUser`
+- [x] Configure authentication state in route handlers — same helpers;
+      `AppError` carries the 401, so a handler answers with `.toResponse()`
 
 ### Application Auth Helpers
 
-- [ ] Create `getCurrentUser`
-- [ ] Create `requireCurrentUser`
-- [ ] Create ownership guard helpers
-- [ ] Create API auth helpers
-- [ ] Create authorization error utilities
+- [x] Create `getCurrentUser` — `lib/auth.ts` (Clerk) and `convex/lib/auth.ts`
+      (Convex identity)
+- [x] Create `requireCurrentUser` — both sides
+- [x] Create ownership guard helpers — `requireOwner` and `authorizePasteWrite`
+      in Convex; `requireOwnedPaste` in `lib/auth.ts` delegates to Convex so the
+      check cannot be bypassed by skipping the app-side call
+- [x] Create API auth helpers — `authedConvex()` forwards Clerk's `convex` JWT so
+      a server-side Convex call runs as the signed-in user
+- [x] Create authorization error utilities — `AppError` / `ErrorCode`
+      (`UNAUTHORIZED` 401, `FORBIDDEN` 403), already the codes Convex `fail()`
+      raises
 
 ### Security
 
-- [ ] Verify Clerk cookies are not scoped to `.pastehtml.assoli.site`
-- [ ] Verify wildcard paste hosts cannot access Clerk credentials
-- [ ] Verify authenticated mutations validate identity inside Convex
-- [ ] Add origin checks where required
-- [ ] Add CSRF protections where required
-- [ ] Test logout invalidation
+- [x] Verify Clerk cookies are not scoped to `.pastehtml.assoli.site` —
+      `e2e/auth.spec.ts` signs in and asserts every app-host cookie has an exact
+      `Domain`, never a leading dot
+- [x] Verify wildcard paste hosts cannot access Clerk credentials — three layers:
+      `proxy.test.ts` proves Clerk never runs on a paste host and that `Cookie`
+      and `Authorization` are stripped from the rewrite; `e2e/auth.spec.ts` reads
+      `document.cookie` from inside a paste while a real session is live
+- [x] Verify authenticated mutations validate identity inside Convex — every
+      owner check derives the caller from `ctx.auth.getUserIdentity()`, never
+      from an argument; covered by the owner-authorization and claim suites
+- [x] ~~Add origin checks where required~~ — not required: Convex authenticates
+      with a bearer JWT rather than cookies, and the app has no Server Actions or
+      cookie-authenticated mutating route, so no endpoint is reachable
+      cross-site with ambient credentials
+- [x] ~~Add CSRF protections where required~~ — same reason. Milestone 15
+      re-audits this with the full header and CSP pass, and Milestone 10 must
+      re-check it when the REST API lands.
+- [x] Test logout invalidation — `e2e/auth.spec.ts` signs out and the next
+      `/dashboard` request is bounced to `/sign-in`
 
 ### Account Claiming
 
-- [ ] Decide whether anonymous pastes can be claimed after sign-in
-- [ ] If supported, implement claim flow
-- [ ] Validate anonymous update token before claiming
-- [ ] Prevent claiming a paste twice
+- [x] Decide whether anonymous pastes can be claimed after sign-in — **yes**
+      (PRD open question 11). The browser already holds the update token after
+      publishing, so this is the natural bridge into the dashboard.
+- [x] If supported, implement claim flow — `pastes.claim` + "Save to my account"
+      on the publish result
+- [x] Validate anonymous update token before claiming — constant-time compare
+      against the stored SHA-256, via the shared `requireUpdateToken`
+- [x] Prevent claiming a paste twice — the claim retires the token and sets
+      `ownerId`; a second attempt gets `CONFLICT`
 
 ## Milestone Acceptance Criteria
 
-- [ ] Users can register, sign in, and sign out
-- [ ] Convex can securely identify signed-in users
-- [ ] Authenticated pastes are owned by the correct user
-- [ ] Wildcard paste subdomains do not receive authenticated app credentials
+- [x] Users can register, sign in, and sign out
+- [x] Convex can securely identify signed-in users
+- [x] Authenticated pastes are owned by the correct user
+- [x] Wildcard paste subdomains do not receive authenticated app credentials
 
 ---
 

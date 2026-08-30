@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useConvex } from "convex/react";
+import { useConvex, useMutation } from "convex/react";
+import { Show } from "@clerk/nextjs";
+import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { AppError } from "@/lib/errors";
 import { publishHtml, type PublishResult } from "@/lib/upload";
@@ -155,6 +157,9 @@ function Published({
             delete this paste without an account.
           </p>
           <Value value={result.updateToken} />
+          <Show when="signed-in">
+            <ClaimPaste token={result.token} updateToken={result.updateToken} />
+          </Show>
         </div>
       )}
 
@@ -162,6 +167,59 @@ function Published({
         Publish another
       </Button>
     </main>
+  );
+}
+
+/**
+ * Anonymous publish, then sign in: the update token is still in this page's
+ * state, so the paste can be moved into the account that is now signed in.
+ * Claiming retires the token, which is why this disappears once it succeeds.
+ */
+function ClaimPaste({
+  token,
+  updateToken,
+}: {
+  token: string;
+  updateToken: string;
+}) {
+  const claim = useMutation(api.pastes.claim);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  if (status === "saved")
+    return (
+      <p className="text-muted-foreground text-sm">
+        Saved to your account. The update token above no longer works.
+      </p>
+    );
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        className="self-start"
+        disabled={status === "saving"}
+        onClick={async () => {
+          setStatus("saving");
+          setError(null);
+          try {
+            await claim({ token, updateToken });
+            setStatus("saved");
+          } catch (cause) {
+            setError(messageOf(cause));
+            setStatus("idle");
+          }
+        }}
+      >
+        Save to my account
+      </Button>
+      {error && (
+        <p role="alert" className="text-destructive text-sm">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 

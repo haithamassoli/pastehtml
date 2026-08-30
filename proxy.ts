@@ -24,7 +24,12 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
 
     const url = request.nextUrl.clone();
     url.pathname = `${PASTE_RUNTIME_PREFIX}/${subdomain}`;
-    return NextResponse.rewrite(url);
+    // Defence in depth. Clerk's cookies are host-only, so a paste origin should
+    // never carry one; if a misconfigured Domain attribute ever made one
+    // subdomain-visible, the runtime still must not receive it.
+    return NextResponse.rewrite(url, {
+      request: { headers: withoutCredentials(request.headers) },
+    });
   }
 
   // The runtime route is reachable only through the rewrite above. A rewrite
@@ -33,6 +38,15 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
     return new NextResponse(null, { status: 404 });
 
   return clerk(request, event);
+}
+
+/** Anything the browser might attach that could authenticate the app. */
+const CREDENTIAL_HEADERS = ["cookie", "authorization"];
+
+function withoutCredentials(headers: Headers): Headers {
+  const stripped = new Headers(headers);
+  for (const name of CREDENTIAL_HEADERS) stripped.delete(name);
+  return stripped;
 }
 
 export const config = {

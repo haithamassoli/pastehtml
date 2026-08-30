@@ -40,6 +40,20 @@ export function requireOwner<T extends { ownerId?: string }>(
 }
 
 /**
+ * The anonymous management secret. Only its SHA-256 is stored, and the
+ * comparison is constant-time, so a wrong guess leaks nothing about the hash.
+ */
+export async function requireUpdateToken(
+  paste: Doc<"pastes">,
+  updateToken?: string,
+): Promise<void> {
+  if (!updateToken || !paste.updateTokenHash)
+    fail("UNAUTHORIZED", "An update token is required for this paste.");
+  if (!timingSafeEqual(await sha256Hex(updateToken), paste.updateTokenHash))
+    fail("FORBIDDEN", "Invalid update token.");
+}
+
+/**
  * Authorizes a mutation on a paste. Owned pastes require the matching signed-in
  * user; anonymous pastes require the raw update token issued at creation.
  */
@@ -52,8 +66,5 @@ export async function authorizePasteWrite(
     requireOwner(await requireCurrentUser(ctx), paste);
     return;
   }
-  if (!updateToken || !paste.updateTokenHash)
-    fail("UNAUTHORIZED", "An update token is required for this paste.");
-  if (!timingSafeEqual(await sha256Hex(updateToken), paste.updateTokenHash))
-    fail("FORBIDDEN", "Invalid update token.");
+  await requireUpdateToken(paste, updateToken);
 }

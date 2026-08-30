@@ -221,6 +221,78 @@ describe("owner authorization", () => {
   });
 });
 
+describe("account claiming", () => {
+  it("moves an anonymous paste into the signed-in account and retires the token", async () => {
+    const { t, alice } = setup();
+    const { token, updateToken } = await createPaste(t);
+
+    await alice.mutation(api.pastes.claim, {
+      token,
+      updateToken: updateToken!,
+    });
+
+    const owned = await alice.query(api.pastes.getOwned, { token });
+    expect(owned.isOwned).toBe(true);
+    expect(await alice.query(api.pastes.listByOwner, {})).toHaveLength(1);
+
+    // The stored hash is gone, not merely shadowed by the new owner.
+    await t.run(async (ctx) => {
+      const row = await ctx.db.get("pastes", owned._id);
+      expect(row!.updateTokenHash).toBeUndefined();
+    });
+
+    // The anonymous secret stops working the moment the paste has an owner.
+    expect(
+      await codeOf(
+        t.mutation(api.pastes.update, {
+          token,
+          updateToken: updateToken!,
+          title: "Still anonymous?",
+        }),
+      ),
+    ).toBe("UNAUTHORIZED");
+  });
+
+  it("refuses a bad token, a signed-out caller, and an already-owned paste", async () => {
+    const { t, alice, bob } = setup();
+    const { token, updateToken } = await createPaste(t);
+
+    expect(
+      await codeOf(
+        t.mutation(api.pastes.claim, { token, updateToken: updateToken! }),
+      ),
+    ).toBe("UNAUTHORIZED");
+    expect(
+      await codeOf(
+        alice.mutation(api.pastes.claim, {
+          token,
+          updateToken: "z".repeat(32),
+        }),
+      ),
+    ).toBe("FORBIDDEN");
+
+    await alice.mutation(api.pastes.claim, {
+      token,
+      updateToken: updateToken!,
+    });
+
+    // Second claim, by anyone, with the token that was just retired.
+    expect(
+      await codeOf(
+        bob.mutation(api.pastes.claim, { token, updateToken: updateToken! }),
+      ),
+    ).toBe("CONFLICT");
+    expect(
+      await codeOf(
+        alice.mutation(api.pastes.claim, { token, updateToken: updateToken! }),
+      ),
+    ).toBe("CONFLICT");
+    expect(await codeOf(bob.query(api.pastes.getOwned, { token }))).toBe(
+      "FORBIDDEN",
+    );
+  });
+});
+
 describe("content replacement", () => {
   it("swaps the storage id and deletes only the superseded file", async () => {
     const t = convexTest(schema, modules);

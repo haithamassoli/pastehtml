@@ -9,8 +9,11 @@ vi.mock("@clerk/nextjs/server", () => ({ clerkMiddleware: () => clerk }));
 const { default: proxy } = await import("./proxy");
 
 const event = {} as never;
-const run = async (url: string, host: string) =>
-  (await proxy(new NextRequest(url, { headers: { host } }), event))!;
+const run = async (url: string, host: string, headers: HeadersInit = {}) =>
+  (await proxy(
+    new NextRequest(url, { headers: { host, ...headers } }),
+    event,
+  ))!;
 
 beforeEach(() => clerk.mockClear());
 
@@ -46,6 +49,25 @@ describe("wildcard paste hosts", () => {
 
     expect(response.status).toBe(404);
     expect(clerk).not.toHaveBeenCalled();
+  });
+
+  it("strips app credentials before the runtime sees the request", async () => {
+    const response = await run(
+      "http://abc123.localhost:3000/",
+      "abc123.localhost:3000",
+      { cookie: "__session=stolen", authorization: "Bearer stolen" },
+    );
+
+    // Next.js rebuilds the upstream request from this list, deleting every
+    // header missing from it — so an absent name is a header the runtime and
+    // the paste's own origin never see.
+    const overridden = response.headers
+      .get("x-middleware-override-headers")!
+      .split(",");
+    expect(overridden).toContain("host");
+    expect(overridden).not.toContain("cookie");
+    expect(overridden).not.toContain("authorization");
+    expect(JSON.stringify([...response.headers])).not.toContain("stolen");
   });
 
   it("cannot rewrite into a privileged internal route", async () => {

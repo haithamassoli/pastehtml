@@ -12,6 +12,7 @@ import {
   getCurrentUser,
   requireCurrentUser,
   requireOwner,
+  requireUpdateToken,
 } from "./lib/auth";
 import {
   generatePasteToken,
@@ -286,6 +287,36 @@ export const replaceContent = mutation({
       updatedAt: Date.now(),
     });
     if (previous !== args.storageId) await deleteFile(ctx, previous);
+    return null;
+  },
+});
+
+/**
+ * Transfers an anonymous paste into the signed-in user's account. The browser
+ * still holds the update token it was issued at publish time, so this is the
+ * bridge between anonymous publishing and the dashboard.
+ *
+ * The token is retired by the claim: exactly one account can ever take a paste,
+ * and afterwards only the owner can manage it.
+ */
+export const claim = mutation({
+  args: { token: v.string(), updateToken: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const user = await requireCurrentUser(ctx);
+    const paste = await requireByToken(ctx, args.token);
+    // Owned already — by this user or by someone else. Either way the update
+    // token no longer exists, so there is nothing left to claim.
+    if (paste.ownerId)
+      fail("CONFLICT", "This paste already belongs to an account.");
+    await requireUpdateToken(paste, args.updateToken);
+
+    await ctx.db.patch("pastes", paste._id, {
+      ownerId: user.id,
+      // Retiring the secret is what makes the claim one-shot.
+      updateTokenHash: undefined,
+      updatedAt: Date.now(),
+    });
     return null;
   },
 });

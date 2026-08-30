@@ -44,6 +44,43 @@ Copy `.env.example` to `.env.local` and fill in:
 Required variables are validated at boot in `lib/env.ts`; a missing one throws
 immediately.
 
+## Authentication
+
+Clerk holds the sessions; Convex verifies them. `convex/auth.config.ts` points at
+`CLERK_JWT_ISSUER_DOMAIN` (set on the Convex deployment, not in `.env.local`), so
+`ctx.auth.getUserIdentity()` inside a Convex function is checked against Clerk's
+JWKS. **Every ownership decision happens there** — a Convex function derives the
+caller from that identity and never from an argument, so no application-side
+guard can be skipped to reach someone else's paste. `ownerId` stores Clerk's
+`tokenIdentifier`, the stable identity key.
+
+`lib/auth.ts` covers the Next.js side: `getCurrentUser` / `requireCurrentUser`
+for server components and route handlers, and `authedConvex()` — a Convex client
+that forwards Clerk's `convex` JWT so a server-side call runs as the signed-in
+user rather than anonymously.
+
+### Isolation from paste origins
+
+A wildcard paste host never reaches Clerk. `proxy.ts` branches on the Host header
+before `clerkMiddleware` runs, so there is no handshake and no session cookie on
+`<token>.pastehtml.assoli.site`; the rewrite into the runtime also strips
+`Cookie` and `Authorization`, so a domain-scoped cookie added by mistake still
+would not arrive. `e2e/auth.spec.ts` signs in for real and then asserts both
+halves: the app cookie carries no leading-dot Domain, and `document.cookie` is
+empty inside a paste.
+
+There is no cookie-authenticated mutating endpoint in the app — Convex
+authenticates with a bearer JWT, not cookies, and the app has no Server Actions —
+so there is nothing for a cross-site request to forge. Milestone 15 revisits this
+alongside the full header and CSP audit.
+
+### Claiming an anonymous paste
+
+Publishing without an account returns an update token once. Sign in on the same
+page and "Save to my account" calls `pastes.claim`, which verifies that token and
+transfers ownership. The claim retires the token, so a paste can only ever be
+taken into one account.
+
 ## Domains
 
 Every paste is served from its own origin, `<token>.pastehtml.assoli.site`, so
@@ -103,6 +140,23 @@ open http://<token>.localhost:3000         # the paste that token published
 
 `lib/host.ts` derives the root host from `NEXT_PUBLIC_APP_URL` and ignores the
 port, so the same routing code runs in development and production.
+
+## Testing
+
+`npm run test` runs the Vitest suites (Convex functions under `convex-test`,
+host routing, and the serving endpoints) and needs nothing running.
+
+`npm run test:e2e` drives a real browser and needs both `npx convex dev` and a
+Clerk development instance. The auth specs sign in as a `+clerk_test` fixture
+user, which never receives real mail — create it once per instance:
+
+```bash
+clerk users create -d '{"email_address":["e2e+clerk_test@example.com"],"password":"<15+ chars>"}' --yes
+```
+
+`e2e/global.setup.ts` fetches Clerk's testing token (which bypasses bot
+protection) from the keys in `.env.local`. Override the fixture address with
+`E2E_CLERK_USER_EMAIL` if your instance uses a different one.
 
 ## Architecture
 
