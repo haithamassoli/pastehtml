@@ -10,6 +10,10 @@ import { expect, test, type Page } from "@playwright/test";
 const USER = process.env.E2E_CLERK_USER_EMAIL ?? "e2e+clerk_test@example.com";
 const HTML = "<h1>published with an API key</h1>";
 
+/** Appended to anything served as HTML — see `lib/paste-http.ts`. */
+const FONT_LINK =
+  '<link rel="stylesheet" href="http://localhost:3000/fonts/thmanyah.css">';
+
 /**
  * Creates a key on the settings page and returns the secret, which the UI shows
  * exactly once. `scopes` names the boxes to leave ticked; the form starts with
@@ -62,7 +66,9 @@ test("publishes with a key made in the settings UI, then stops when it is revoke
   // Owned by the account the key belongs to, so no anonymous update token is
   // issued — the key is the credential from here on.
   expect(data.updateToken).toBeUndefined();
-  expect(await (await request.get(data.publicUrl)).text()).toBe(HTML);
+  expect(await (await request.get(data.publicUrl)).text()).toBe(
+    `${HTML}${FONT_LINK}`,
+  );
 
   // The key reads back the owner view, which a stranger never sees.
   const owned = await request.get(`/api/v1/pastes/${data.token}`, {

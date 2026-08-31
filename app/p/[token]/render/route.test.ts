@@ -12,6 +12,8 @@ vi.mock("convex/browser", () => ({
 const { GET } = await import("./route");
 
 const HTML = "<script>document.title='ran'</script><form></form>";
+const FONT_LINK =
+  '<link rel="stylesheet" href="http://localhost:3000/fonts/thmanyah.css">';
 
 const PASTE = {
   token: "abc123def456",
@@ -49,7 +51,7 @@ describe("preview endpoint", () => {
     const response = await get();
 
     expect(response.status).toBe(200);
-    expect(await response.text()).toBe(HTML);
+    expect(await response.text()).toBe(`${HTML}${FONT_LINK}`);
     expect(response.headers.get("Content-Type")).toBe(
       "text/html; charset=utf-8",
     );

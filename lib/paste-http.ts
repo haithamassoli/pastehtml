@@ -6,6 +6,7 @@
 import { ConvexHttpClient } from "convex/browser";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
+import { config } from "@/lib/config";
 import { env } from "@/lib/env";
 
 export const convex = new ConvexHttpClient(env.CONVEX_URL);
@@ -39,6 +40,29 @@ export const CACHE_CONTROL = "public, max-age=0, must-revalidate";
 // but bytes only an unlocked visitor may see should not sit in a cache nobody
 // here controls, and `private` is the one word that says so.
 export const PRIVATE_CACHE_CONTROL = "private, max-age=0, must-revalidate";
+
+/**
+ * Appended to every paste served as HTML, so Thmanyah Sans applies to all of
+ * them (see the stylesheet for what it overrides). It goes after the document
+ * rather than before it — prepending anything ahead of a `<!DOCTYPE>` would
+ * drop the page into quirks mode — and it is a link to the app origin rather
+ * than an inline block, so one cached stylesheet covers every paste and the
+ * bytes added per response stay this one line.
+ */
+const FONT_LINK = `<link rel="stylesheet" href="${config.appUrl.replace(/\/$/, "")}/fonts/thmanyah.css">`;
+
+/**
+ * A content type that names UTF-8. Browsers only guess an encoding when they
+ * are not told one, and their guess is not UTF-8 — which is what turns Arabic
+ * (and every other non-Latin script) in a paste with no `<meta charset>` into
+ * mojibake. The stored type comes from the uploaded file, which carries no
+ * charset, so this is where it gets one; a paste that declared its own is left
+ * alone.
+ */
+export const utf8 = (contentType: string) =>
+  /;\s*charset=/i.test(contentType)
+    ? contentType
+    : `${contentType}; charset=utf-8`;
 
 /**
  * Every answer that is not the paste itself: not found, withheld, disabled,
@@ -95,7 +119,8 @@ export async function resolvePaste(
 }
 
 /**
- * Streams the stored bytes through verbatim under the caller's headers. The
+ * Streams the stored bytes through under the caller's headers — unchanged,
+ * apart from the stylesheet link an HTML document picks up at the end. The
  * ETag is Convex's stored SHA-256 digest — computed by File Storage when the
  * bytes landed and re-read on every resolve, so replacing a paste's content
  * changes the digest, and with it the ETag, with nothing to keep in sync.
@@ -113,7 +138,14 @@ export async function serveStored(
       paste.visibility === "protected" ? PRIVATE_CACHE_CONTROL : CACHE_CONTROL,
     ETag: etag,
     ...headers,
+    "Content-Type": utf8(headers["Content-Type"] ?? "text/plain"),
   };
+
+  // Only the surfaces that render the paste as a document get the font; the raw
+  // endpoint hands over source text and must stay byte-for-byte the upload.
+  const suffix = responseHeaders["Content-Type"].startsWith("text/html")
+    ? new TextEncoder().encode(FONT_LINK)
+    : null;
 
   if (matchesEtag(request.headers.get("if-none-match"), etag))
     return new Response(null, { status: 304, headers: responseHeaders });
@@ -121,11 +153,21 @@ export async function serveStored(
   const stored = await fetch(paste.url);
   if (!stored.ok || !stored.body) return plain(502, "Could not load content.");
 
-  // Never rewritten, never re-encoded: the bytes that were uploaded.
-  return new Response(stored.body, {
+  // Never re-encoded and never rewritten in the middle: the bytes that were
+  // uploaded, and then the stylesheet link.
+  return new Response(suffix ? withSuffix(stored.body, suffix) : stored.body, {
     headers: {
       ...responseHeaders,
-      "Content-Length": String(paste.contentLength),
+      "Content-Length": String(paste.contentLength + (suffix?.length ?? 0)),
     },
   });
+}
+
+/** The stream, then `suffix` — still streamed, nothing buffered. */
+function withSuffix(body: ReadableStream<Uint8Array>, suffix: Uint8Array) {
+  return body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      flush: (controller) => controller.enqueue(suffix),
+    }),
+  );
 }

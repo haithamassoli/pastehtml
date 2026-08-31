@@ -10,6 +10,11 @@ import { legacyFixtures, sha256 } from "./fixtures/legacy/fixtures";
 // The old Rails app is not runnable from this repo, so "compare old behavior"
 // is verified as: what the corpus went in as is what comes back out — no
 // re-encoding, no BOM stripping, no line-ending translation, no truncation.
+//
+// The one intended difference: a document served as HTML gets the site font
+// stylesheet appended (`lib/paste-http.ts`). The stored bytes are still the
+// document, untouched and in order — the link only follows them — and the raw
+// endpoint, which is the archival surface, is byte-for-byte the upload.
 const { query, mutation, after } = vi.hoisted(() => ({
   query: vi.fn(),
   mutation: vi.fn(),
@@ -28,6 +33,10 @@ const { GET: raw } = await import("@/app/p/[token]/raw/route");
 const { GET: runtime } = await import("@/app/internal/paste/[subdomain]/route");
 
 const TOKEN = "k3n8pq2vd41x";
+
+/** What an HTML surface appends; `NEXT_PUBLIC_APP_URL` is unset under vitest. */
+const FONT_LINK =
+  '<link rel="stylesheet" href="http://localhost:3000/fonts/thmanyah.css">';
 
 /**
  * What Convex reports for a stored object, given the bytes it holds. Length and
@@ -121,7 +130,7 @@ describe("legacy fixtures round-trip unchanged", () => {
         );
       });
 
-      it("comes back from the wildcard runtime byte for byte, under its own content type", async () => {
+      it("comes back from the wildcard runtime unchanged but for the appended font link, under its own content type", async () => {
         const response = await serve(
           runtime,
           fixture.bytes,
@@ -129,10 +138,17 @@ describe("legacy fixtures round-trip unchanged", () => {
           "text/html; charset=iso-8859-1",
         );
         const body = Buffer.from(await response.arrayBuffer());
+        const document = body.subarray(0, fixture.bytes.byteLength);
 
         expect(response.status).toBe(200);
-        expect(body.equals(fixture.bytes)).toBe(true);
-        expect(sha256(body)).toBe(sha256(fixture.bytes));
+        expect(document.equals(fixture.bytes)).toBe(true);
+        expect(sha256(document)).toBe(sha256(fixture.bytes));
+        expect(body.subarray(fixture.bytes.byteLength).toString()).toBe(
+          FONT_LINK,
+        );
+        expect(response.headers.get("Content-Length")).toBe(
+          String(body.byteLength),
+        );
         // Whatever was stored is what is sent, charset and all: a paste that
         // was served as latin-1 for a decade keeps rendering the same way.
         expect(response.headers.get("Content-Type")).toBe(
@@ -156,10 +172,9 @@ describe("tokens carried over from the old app", () => {
 
       for (const route of [raw, runtime]) {
         const response = await serve(route, bytes, token);
+        const body = Buffer.from(await response.arrayBuffer());
         expect(response.status).toBe(200);
-        expect(Buffer.from(await response.arrayBuffer()).equals(bytes)).toBe(
-          true,
-        );
+        expect(body.subarray(0, bytes.byteLength).equals(bytes)).toBe(true);
         expect(query.mock.lastCall?.[1]).toMatchObject({ subdomain: token });
       }
     });

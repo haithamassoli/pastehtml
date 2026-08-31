@@ -78,17 +78,36 @@ describe("paste runtime", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("serves the stored HTML verbatim with its own content type", async () => {
+  it("serves the stored HTML with its own content type, plus the font", async () => {
     const response = await get();
+    const body = await response.text();
 
     expect(response.status).toBe(200);
-    expect(await response.text()).toBe("<h1>runtime</h1>");
+    expect(body.startsWith("<h1>runtime</h1>")).toBe(true);
+    // Appended, never prepended: anything ahead of a doctype means quirks mode.
+    expect(body).toContain('href="http://localhost:3000/fonts/thmanyah.css"');
+    // The bytes the browser is promised have to include the appended link.
+    expect(response.headers.get("Content-Length")).toBe(String(body.length));
     expect(response.headers.get("Content-Type")).toBe(
       "text/html; charset=utf-8",
     );
     expect(response.headers.get("ETag")).toBe('"digest"');
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(response.headers.get("Referrer-Policy")).toBe("no-referrer");
+  });
+
+  it("names UTF-8 even when the upload did not, so Arabic renders", async () => {
+    query.mockResolvedValue({ ...PASTE, contentType: "text/html" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("<h1>مرحبا</h1>", { status: 200 })),
+    );
+
+    const response = await get();
+
+    expect(response.headers.get("Content-Type")).toBe(
+      "text/html; charset=utf-8",
+    );
   });
 
   it("never sets a cookie on the paste origin", async () => {

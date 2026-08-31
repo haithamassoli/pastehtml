@@ -6,6 +6,10 @@ import { expect, test } from "@playwright/test";
 // Requires a running Convex dev deployment (`npx convex dev`).
 const HTML = "<h1>published by curl</h1>";
 
+/** Appended to anything served as HTML — see `lib/paste-http.ts`. */
+const FONT_LINK =
+  '<link rel="stylesheet" href="http://localhost:3000/fonts/thmanyah.css">';
+
 const html = (body: string) => ({
   headers: { "Content-Type": "text/html" },
   data: body,
@@ -31,7 +35,9 @@ test("publishes, reads, updates and deletes a paste anonymously", async ({
   expect(data.updateToken).toHaveLength(32);
 
   // The public URL really serves the bytes we sent.
-  expect(await (await request.get(data.publicUrl)).text()).toBe(HTML);
+  expect(await (await request.get(data.publicUrl)).text()).toBe(
+    `${HTML}${FONT_LINK}`,
+  );
 
   const fetched = await request.get(`/api/v1/pastes/${data.token}`);
   expect(fetched.status()).toBe(200);

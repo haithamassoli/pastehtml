@@ -5,6 +5,10 @@ import { expect, test } from "@playwright/test";
 // Requires a running Convex dev deployment (`npx convex dev`).
 const HTML = "<h1>served from a wildcard subdomain</h1>";
 
+/** Appended to anything served as HTML — see `lib/paste-http.ts`. */
+const FONT_LINK =
+  '<link rel="stylesheet" href="http://localhost:3000/fonts/thmanyah.css">';
+
 test("serves a published paste from its own subdomain", async ({
   page,
   request,
@@ -36,7 +40,7 @@ test("serves a published paste from its own subdomain", async ({
   expect(response.headers()["content-type"]).toContain("text/html");
   expect(response.headers()["set-cookie"]).toBeUndefined();
   expect(response.headers()["x-content-type-options"]).toBe("nosniff");
-  expect(await response.text()).toBe(HTML);
+  expect(await response.text()).toBe(`${HTML}${FONT_LINK}`);
 
   // Conditional requests are answered without re-reading storage.
   const revalidated = await request.get(publicUrl, {

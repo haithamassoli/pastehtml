@@ -109,8 +109,10 @@ that reads the output schema, and as JSON text for one that does not.
 }
 ```
 
-`publicUrl` is the working link — it serves the uploaded bytes verbatim on their
-own origin, so scripts and styles in the page run. Give that one to the user.
+`publicUrl` is the working link — it serves the uploaded bytes on their own
+origin, so scripts and styles in the page run. The site font stylesheet is
+appended to the document; `rawUrl` is the byte-for-byte upload. Give the public
+one to the user.
 
 ### `get_paste`
 

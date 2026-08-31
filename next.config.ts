@@ -103,6 +103,15 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Content-Security-Policy", value: CSP }],
       })),
       {
+        // Every paste links this stylesheet from its own origin (see
+        // `lib/paste-http.ts`), and a font file is always fetched in CORS mode
+        // — without this header the browser downloads it and refuses to use it.
+        // Nothing here is private: these bytes are the same for every visitor.
+        source: "/fonts/:path*",
+        has: appHost,
+        headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
+      },
+      {
         // The service worker outlives a deploy unless the browser is told not
         // to keep it: a cached `sw.js` would go on serving the previous
         // shell. It is also the one script that can intercept navigations, so

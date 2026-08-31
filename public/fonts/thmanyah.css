@@ -1,0 +1,45 @@
+/* Injected into every HTML paste by lib/paste-http.ts. Served from the app
+   origin, so the woff2 files need `Access-Control-Allow-Origin` (next.config). */
+@font-face {
+  font-family: "Thmanyah Sans";
+  src: url("/fonts/thmanyahsans-Light.woff2") format("woff2");
+  font-weight: 300;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Thmanyah Sans";
+  src: url("/fonts/thmanyahsans-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Thmanyah Sans";
+  src: url("/fonts/thmanyahsans-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Thmanyah Sans";
+  src: url("/fonts/thmanyahsans-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Thmanyah Sans";
+  src: url("/fonts/thmanyahsans-Black.woff2") format("woff2");
+  font-weight: 900;
+  font-display: swap;
+}
+
+/* ponytail: one blanket rule. It also overrides a paste's icon font and its
+   monospace code blocks; a paste that needs an exception uses an inline
+   `style="font-family:… !important"`, which outranks this. */
+* {
+  font-family: "Thmanyah Sans", system-ui, sans-serif !important;
+}
+
+/* Arabic reads right-to-left, and a paste that declares `lang="ar"` without a
+   `dir` almost always meant to. An explicit `dir` is left alone. */
+:lang(ar):not([dir]) {
+  direction: rtl;
+}

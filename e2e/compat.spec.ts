@@ -43,6 +43,21 @@ async function publish(
   return (await created.json()).data;
 }
 
+/**
+ * The stylesheet `lib/paste-http.ts` appends to anything served as HTML, so the
+ * paste origin returns the document and then this. The raw endpoint does not.
+ */
+const FONT_LINK = Buffer.from(
+  '<link rel="stylesheet" href="http://localhost:3000/fonts/thmanyah.css">',
+);
+
+/** What `url` is expected to return for a paste holding `bytes`. */
+const expectedBytes = (
+  url: string,
+  paste: { rawUrl: string },
+  bytes: Buffer,
+) => (url === paste.rawUrl ? bytes : Buffer.concat([bytes, FONT_LINK]));
+
 for (const fixture of legacyFixtures) {
   test(`${fixture.name} survives a round trip — ${fixture.why}`, async ({
     request,
@@ -52,18 +67,22 @@ for (const fixture of legacyFixtures) {
     for (const url of [paste.publicUrl, paste.rawUrl]) {
       const response = await request.get(url);
       const body = await response.body();
+      const expected = expectedBytes(url, paste, fixture.bytes);
 
       expect(response.status(), url).toBe(200);
       // The assertion the whole milestone is about.
-      expect(
-        body.equals(fixture.bytes),
-        `${url} returned different bytes`,
-      ).toBe(true);
-      expect(body.byteLength, url).toBe(fixture.bytes.byteLength);
-      expect(response.headers()["content-length"], url).toBe(
-        String(fixture.bytes.byteLength),
+      expect(body.equals(expected), `${url} returned different bytes`).toBe(
+        true,
       );
-      expect(sha256(body), url).toBe(sha256(fixture.bytes));
+      expect(body.byteLength, url).toBe(expected.byteLength);
+      expect(response.headers()["content-length"], url).toBe(
+        String(expected.byteLength),
+      );
+      // The ETag is the stored object's digest, so it names the document
+      // itself — not the bytes the HTML surface hands over.
+      expect(sha256(body.subarray(0, fixture.bytes.byteLength)), url).toBe(
+        sha256(fixture.bytes),
+      );
       // Convex's own digest of the stored object, handed out as the ETag: an
       // independent witness that storage holds these bytes and not a copy.
       expect(response.headers()["etag"], url).toBe(
@@ -148,6 +167,9 @@ test("a URL carried over from the old app keeps working after an update", async 
   for (const url of [paste.publicUrl, paste.rawUrl]) {
     const response = await request.get(url);
     expect(response.status(), url).toBe(200);
-    expect((await response.body()).equals(replacement), url).toBe(true);
+    expect(
+      (await response.body()).equals(expectedBytes(url, paste, replacement)),
+      url,
+    ).toBe(true);
   }
 });
