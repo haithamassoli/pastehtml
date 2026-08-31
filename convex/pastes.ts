@@ -596,6 +596,24 @@ export const MAX_UNLOCK_ATTEMPTS_PER_PASTE = 100;
 export const UNLOCK_WINDOW_MS = 15 * 60 * 1000;
 
 /**
+ * How many unlock sessions one paste may hold at once, oldest evicted first.
+ *
+ * Nothing charges the *success* path — a visitor who knows the password may
+ * unlock as often as it likes, and each success inserts a row that lives for
+ * `UNLOCK_TTL_MS`. Without a ceiling the `.collect()` in `unlock` and in
+ * `revokeUnlocks` eventually cross Convex's per-transaction read limit, and the
+ * first thing that breaks is the owner's ability to change or remove the
+ * password — the one action that would end the abuse.
+ *
+ * ponytail: a hard cap rather than a rate limit, because rate-limiting here
+ * would be worse than the bug. `writeClient` charges an owned paste to
+ * `user:<ownerId>`, so charging this public mutation to `paste:write` would let
+ * any visitor drain the owner's entire write budget. The cap costs the least
+ * recent visitor of a very popular paste one re-entry; nothing else notices.
+ */
+export const MAX_UNLOCK_SESSIONS = 1000;
+
+/**
  * The client column for the per-paste cap. A caller who sends this literally
  * only charges their own guesses twice, which is not a trade anyone wants.
  */
@@ -782,13 +800,21 @@ export const unlock = mutation({
     if (attempts) await ctx.db.delete("unlockAttempts", attempts._id);
 
     // Self-cleaning: expired sessions for this paste go on the way past, so
-    // the table never needs a sweep of its own.
+    // the table never needs a sweep of its own. What is still live is counted
+    // on the same pass and held to `MAX_UNLOCK_SESSIONS`, oldest first — every
+    // session carries the same TTL, so `expiresAt` order is issue order.
+    const live: Doc<"pasteUnlocks">[] = [];
     for (const session of await ctx.db
       .query("pasteUnlocks")
       .withIndex("by_paste", (q) => q.eq("pasteId", paste._id))
       .collect())
       if (session.expiresAt <= now)
         await ctx.db.delete("pasteUnlocks", session._id);
+      else live.push(session);
+
+    live.sort((a, b) => a.expiresAt - b.expiresAt);
+    for (const evicted of live.slice(0, live.length - MAX_UNLOCK_SESSIONS + 1))
+      await ctx.db.delete("pasteUnlocks", evicted._id);
 
     const unlockToken = generateUnlockToken();
     const expiresAt = now + UNLOCK_TTL_MS;

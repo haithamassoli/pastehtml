@@ -9,6 +9,10 @@ without breaking a single existing paste URL.
 > — every field name in `scripts/export-legacy.rb` is a guess you have to
 > replace. The staging rehearsal, the duration measurement and the
 > "repeat until clean" loop cannot start until that is done.
+>
+> Milestone 22 closed with this tooling unused and deliberately retained: the
+> site launched on the new stack rather than cutting over from a legacy one, so
+> the blank inventory is not unfinished work. See `docs/decommission.md` §2.
 
 ## The shape of it
 

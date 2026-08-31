@@ -107,6 +107,28 @@ page and "Save to my account" calls `pastes.claim`, which verifies that token an
 transfers ownership. The claim retires the token, so a paste can only ever be
 taken into one account.
 
+## Deployment
+
+Production is `https://pastehtml.assoli.site`. Three managed services carry it,
+and there is no fourth — no VM, no self-managed database, no Ruby, Rails or any
+other runtime beside Node:
+
+| Piece                                       | Runs on                                          | Shipped by                             |
+| ------------------------------------------- | ------------------------------------------------ | -------------------------------------- |
+| Next.js app, paste runtime, host routing    | Vercel — framework preset Next.js, Node 24, iad1 | `git push` to `main`                   |
+| Schema, functions, file storage, rate limit | Convex                                           | `npx convex deploy`                    |
+| Sessions and sign-in                        | Clerk                                            | dashboard configuration, no build step |
+
+Which Convex deployment and which Clerk instance the site talks to is decided
+entirely by the environment variables on the Vercel project — `CONVEX_DEPLOYMENT`,
+`NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL` and the two Clerk keys.
+Moving from a development instance to a production one is a change of values and
+a redeploy, never a change of code. `NEXT_PUBLIC_*` is inlined at build time, so
+every one of those changes needs the redeploy to take effect.
+
+`docs/operations.md` has the runbooks; `docs/decommission.md` records why nothing
+outside these three services is required.
+
 ## Domains
 
 Every paste is served from its own origin, `<token>.pastehtml.assoli.site`, so
@@ -247,5 +269,7 @@ states what an upload has to satisfy, with the limits imported from the
 validators that enforce them.
 
 See `docs/conventions.md` for naming and error-code conventions, `docs/api.md`
-for the REST API reference, `docs/mcp.md` for the MCP server, and
-`docs/tasks.md` for the milestone plan.
+for the REST API reference, `docs/mcp.md` for the MCP server,
+`docs/operations.md` for monitoring and incident runbooks, `docs/migration.md`
+for the legacy import tooling, `docs/decommission.md` for what the rebuild
+replaced, and `docs/tasks.md` for the milestone plan.

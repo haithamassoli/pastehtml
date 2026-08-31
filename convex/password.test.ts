@@ -5,7 +5,11 @@ import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
-import { MAX_UNLOCK_ATTEMPTS, UNLOCK_TTL_MS } from "./pastes";
+import {
+  MAX_UNLOCK_ATTEMPTS,
+  MAX_UNLOCK_SESSIONS,
+  UNLOCK_TTL_MS,
+} from "./pastes";
 import { codeOf, createPaste, users } from "../test/convex-helpers";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -301,5 +305,59 @@ describe("authorization", () => {
 
     await t.mutation(api.pastes.removePassword, { token, updateToken });
     expect((await resolve(t, token))!.locked).toBe(false);
+  });
+});
+
+describe("unlock session table", () => {
+  it("holds one paste to MAX_UNLOCK_SESSIONS, evicting the oldest", async () => {
+    const t = convexTest(schema, modules);
+    const { alice } = users(t);
+    const token = await protectedPaste(alice);
+
+    // Seeded directly rather than through `unlock`: the point is what happens
+    // once the table is already full, and a thousand real password
+    // verifications would buy nothing but a slow test.
+    const { pasteId, oldest } = await t.run(async (ctx) => {
+      const paste = await ctx.db
+        .query("pastes")
+        .withIndex("by_token", (q) => q.eq("token", token))
+        .unique();
+      const now = Date.now();
+      let oldest = null;
+      for (let i = 0; i < MAX_UNLOCK_SESSIONS; i++) {
+        const id = await ctx.db.insert("pasteUnlocks", {
+          pasteId: paste!._id,
+          sessionHash: `seeded-${i}`,
+          // Live, and ordered: the first seeded row is the first evicted.
+          expiresAt: now + UNLOCK_TTL_MS - MAX_UNLOCK_SESSIONS + i,
+        });
+        if (i === 0) oldest = id;
+      }
+      return { pasteId: paste!._id, oldest: oldest! };
+    });
+
+    const unlockToken = granted(await unlock(t, token, PASSWORD));
+
+    const sessions = await t.run((ctx) =>
+      ctx.db
+        .query("pasteUnlocks")
+        .withIndex("by_paste", (q) => q.eq("pasteId", pasteId))
+        .collect(),
+    );
+    expect(sessions).toHaveLength(MAX_UNLOCK_SESSIONS);
+    expect(sessions.map((s) => s._id)).not.toContain(oldest);
+    // The visitor who just unlocked is the one who must still be inside.
+    expect((await resolve(t, token, unlockToken))!.locked).toBe(false);
+
+    // The owner keeps control: revocation still runs over a bounded table.
+    await alice.mutation(api.pastes.removePassword, { token });
+    expect(
+      await t.run((ctx) =>
+        ctx.db
+          .query("pasteUnlocks")
+          .withIndex("by_paste", (q) => q.eq("pasteId", pasteId))
+          .collect(),
+      ),
+    ).toHaveLength(0);
   });
 });

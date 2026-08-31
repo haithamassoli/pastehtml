@@ -11,6 +11,9 @@ export const SUBDOMAIN_MIN_LENGTH = 3;
 export const SUBDOMAIN_MAX_LENGTH = 63;
 
 // Configurable reserved list — subdomains the app itself owns.
+// `clerk`, `accounts` and `clkmail` are Clerk's production CNAMEs under the
+// app host: handing one to a paste would let user HTML answer on a sign-in
+// origin the moment DNS ever moved.
 export const RESERVED_SUBDOMAINS: readonly string[] = [
   "www",
   "api",
@@ -21,6 +24,9 @@ export const RESERVED_SUBDOMAINS: readonly string[] = [
   "mcp",
   "mail",
   "support",
+  "clerk",
+  "accounts",
+  "clkmail",
 ];
 
 const ALLOWED_CONTENT_TYPES = ["text/html", "text/plain"];

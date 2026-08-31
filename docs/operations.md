@@ -9,7 +9,51 @@ Three systems, three consoles:
 | -------------------------------- | -------------------------------- | ------------ |
 | Next.js app, paste runtime, edge | Vercel → the `pastehtml` project | `vercel`     |
 | Database, storage, crons         | `npx convex dashboard`           | `npx convex` |
-| Sessions and sign-in             | Clerk dashboard                  | —            |
+| Sessions and sign-in             | Clerk dashboard                  | `clerk`      |
+
+---
+
+## What production is
+
+| Layer  | Production                                                       | Preview / dev                                                    |
+| ------ | ---------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Vercel | `pastehtml`, functions in `dub1`, Node 24.x                      | one deployment per branch                                        |
+| Convex | `ceaseless-reindeer-646` (`eu-west-1`)                           | a fresh deployment per branch; personal dev per developer        |
+| Clerk  | `ins_3IfmGPBvkwOsxpoaMKSulCuj41F`, `clerk.pastehtml.assoli.site` | the development instance, `cosmic-guppy-4959.clerk.accounts.dev` |
+
+Vercel's build command is `npx convex deploy --cmd 'npm run build'`, so one
+`git push` to `main` ships the app and the backend together: Convex deploys
+first, injects `NEXT_PUBLIC_CONVEX_URL` and `NEXT_PUBLIC_CONVEX_SITE_URL` into
+the `next build` that follows, then pushes functions, schema and crons. Those
+two variables are therefore **not** set in Vercel — setting them would paper
+over a broken deploy key instead of failing the build.
+
+Which backend a build talks to is decided entirely by `CONVEX_DEPLOY_KEY`:
+
+- **Production** holds a `prod:ceaseless-reindeer-646|…` key scoped to
+  `deployment:deploy`.
+- **Preview** holds a `preview:haitham-assoli:pastehtml|…` key. Convex mints a
+  new deployment named after the branch, so a preview branch has no credential
+  for the production deployment and cannot read production data. New preview
+  deployments inherit `CLERK_JWT_ISSUER_DOMAIN` from the project's default
+  environment variables (Convex dashboard → Project Settings), pointed at the
+  Clerk _development_ instance.
+
+Clerk is split the same way: Production carries the `pk_live_`/`sk_live_` pair,
+Preview keeps the `pk_test_`/`sk_test_` pair so PR previews and the Playwright
+specs keep working. Convex verifies Clerk JWTs through
+`CLERK_JWT_ISSUER_DOMAIN`, set per deployment — production is
+`https://clerk.pastehtml.assoli.site`. Each instance needs its own JWT template
+named `convex` with `aud: convex`; without it every authenticated call fails.
+
+Rotate the production Clerk secret and you must update `CLERK_SECRET_KEY` in
+Vercel Production and redeploy — it is not read at runtime from Clerk.
+
+**Manual step:** the production Clerk instance has Google sign-in **off**.
+Clerk's shared OAuth credentials are development-only, so enabling it means
+creating a Google Cloud OAuth client and entering it in the Clerk dashboard.
+Until then production offers email + password only, while development offers
+Google as well.
 
 ---
 
@@ -307,6 +351,29 @@ must be able to write under the domain — either the zone is on Vercel's
 nameservers, or `_acme-challenge.pastehtml` is delegated with two `NS` records
 to `ns1.vercel-dns.com.` / `ns2.vercel-dns.com.`. A missing or edited delegation
 is the usual cause.
+
+**A record added under `pastehtml` took every paste down.** The zone has a
+wildcard at its apex (`*.assoli.site`), and for a while that was what
+synthesized `<token>.pastehtml.assoli.site`. Under RFC 4592 a wildcard never
+synthesizes a name _below an existing node_, so the first explicit record under
+`pastehtml` — the Clerk `clerk` / `accounts` / `clkmail` / `clk._domainkey`
+CNAMEs — created that node and the entire paste namespace went NXDOMAIN until an
+explicit `*.pastehtml` ALIAS was added. So:
+
+> The `*.pastehtml` ALIAS → `cname.vercel-dns-017.com` record is load-bearing.
+> Never delete it, and never assume the apex wildcard covers for it.
+
+The failure signature is the nasty part: the apex keeps serving, `/api/health`
+stays 200, and only paste URLs disappear — no monitor in this repo catches it.
+After **any** DNS edit on `assoli.site`, ask a public resolver, because the
+local one caches the negative answer:
+
+```bash
+dig +short "$(openssl rand -hex 4).pastehtml.assoli.site" @1.1.1.1
+```
+
+Two Vercel anycast addresses back is healthy; empty means every published paste
+is unreachable.
 
 **Everything stops resolving.** Check the nameservers at the registrar
 (Namecheap → Domain List → `assoli.site` → Manage → Domain → NAMESERVERS). If

@@ -1902,53 +1902,98 @@ Deploy the complete rebuilt application to production infrastructure before traf
 
 ### Vercel
 
-- [ ] Create production Vercel project
-- [ ] Configure production environment variables
-- [ ] Configure preview environment variables
-- [ ] Configure build command
-- [ ] Configure Convex deployment command
-- [ ] Configure production domain
-- [ ] Configure wildcard domain
-- [ ] Configure `www`
-- [ ] Verify SSL
-- [ ] Verify deployment protection settings
-- [ ] Verify function runtime settings
-- [ ] Verify preview deployments
+- [x] Create production Vercel project — `pastehtml` under
+      `haitham-assolis-projects`, Hobby plan
+- [x] Configure production environment variables — `NEXT_PUBLIC_APP_URL`
+      (trailing slash removed), live Clerk keys, `CONVEX_DEPLOY_KEY`. The Convex
+      URLs are no longer set by hand: `convex deploy` injects them at build time
+- [x] Configure preview environment variables — dev Clerk keys scoped to Preview
+      only, plus a preview-scoped `CONVEX_DEPLOY_KEY`
+- [x] Configure build command — `npx convex deploy --cmd 'npm run build'`
+- [x] Configure Convex deployment command — same command; the build log confirms
+      the injected deployment URL
+- [x] Configure production domain — `pastehtml.assoli.site`
+- [x] Configure wildcard domain — `*.pastehtml.assoli.site`. Both need an
+      **explicit** ALIAS record; see the RFC 4592 note in `docs/operations.md`
+- [x] Configure `www` — 308 redirect to the apex
+- [x] Verify SSL — apex, wildcard and both Clerk hosts
+- [x] Verify deployment protection settings — `all_except_custom_domains`:
+      production public, preview behind Vercel SSO
+- [x] Verify function runtime settings — Node 24.x, region moved `iad1` → `dub1`
+      to sit beside Convex's `eu-west-1`. `/api/health` went 104ms → 17ms
+- [x] Verify preview deployments — a preview build ran and was torn down
 
 ### Convex
 
-- [ ] Create production Convex deployment
-- [ ] Configure production environment variables
-- [ ] Configure Clerk auth integration
-- [ ] Configure file storage
-- [ ] Verify indexes
-- [ ] Verify scheduled functions
-- [ ] Configure preview deployment strategy
-- [ ] Ensure preview branches cannot access production data
+- [x] Create production Convex deployment — `ceaseless-reindeer-646`
+      (`aws-eu-west-1`), separate from the dev deployment
+- [x] Configure production environment variables — `CLERK_JWT_ISSUER_DOMAIN`
+      pointing at the production Clerk instance
+- [x] Configure Clerk auth integration — production instance
+      `clerk.pastehtml.assoli.site`, `convex` JWT template, DNS/SSL/mail
+      complete. JWKS `kid` matches what Convex validates against
+- [x] Configure file storage — exercised end to end by the production smoke run
+- [x] Verify indexes — 15 created on the production deployment
+- [x] Verify scheduled functions — `analytics:sweep`,
+      `pastes:sweepUnlockAttempts`, `rateLimit:sweep`, `storage:sweepOrphans`
+      all logged executions on prod
+- [x] Configure preview deployment strategy — per-branch deployments via a
+      preview deploy key, inheriting the dev Clerk issuer
+- [x] Ensure preview branches cannot access production data — proven, not
+      assumed: a preview build created its own deployment
+      (`dependable-toad-634`), which was then deleted
 
 ### Smoke Tests
 
-- [ ] Publish anonymous paste in production
-- [ ] Open wildcard public URL
-- [ ] Open raw URL
-- [ ] Open preview URL
-- [ ] Create account
-- [ ] Publish authenticated paste
-- [ ] Create folder
-- [ ] Create API key
-- [ ] Publish through API
-- [ ] Publish through MCP
-- [ ] Protect a paste with password
-- [ ] Verify analytics
-- [ ] Verify logs and Sentry
+Automated in `scripts/smoke.mjs` (`npm run smoke [url]`), which cleans up every
+paste it creates and exits non-zero on the first failure. What needs a signed-in
+browser was done by hand against production and is marked as such.
+
+- [x] Publish anonymous paste in production — script
+- [x] Open wildcard public URL — script; asserts byte-identical body against a
+      non-ASCII payload, not just a 200
+- [x] Open raw URL — script; `text/plain; charset=utf-8` + `nosniff` + identical
+      bytes
+- [x] Open preview URL — script; sandbox CSP with no `allow-same-origin`
+- [x] Create account — **by hand, with a caveat**: the production sign-up form
+      is behind a Turnstile that will not solve under automation, and password
+      sign-in on a fresh device demands an emailed code a synthetic address
+      cannot receive. The account was created through the Clerk Backend API and
+      the session taken by impersonation. Not a product bug, but **no one has
+      yet completed a real production sign-up with a real inbox** — do that once
+- [x] Publish authenticated paste — by hand; published to the account, listed in
+      the dashboard as owned
+- [x] Create folder — by hand; created, listed, renamed, deleted
+- [x] Create API key — by hand; scopes honoured, key shown once, `Last used`
+      tracked, revocation immediate (revoked key → 401)
+- [x] Publish through API — script, with a real production key: 201, owned, no
+      `updateToken`
+- [x] Publish through MCP — script, via the official SDK over
+      `StreamableHTTPClientTransport`: `listTools`, `create_paste`, byte check,
+      `delete_paste`, then asserts the URL 404s
+- [x] Protect a paste with password — script; challenge without the content,
+      wrong password 401, right password 303 + host-only `ph_unlock` cookie,
+      cookie replay serves the exact bytes
+- [x] Verify analytics — by hand; views, 7-day and 24-hour counts, referrer,
+      country and browser breakdowns, correctly split across two browsers
+- [ ] Verify logs and Sentry — **logs yes, Sentry no.** 112 log lines captured
+      across three smoke runs, all `level: info`, request ids and MCP tool lines
+      present. But no `NEXT_PUBLIC_SENTRY_DSN` is set in any environment, and
+      production logs `"errorTracking":false` on every cold start. `lib/sentry.ts`
+      no-ops by design, so nothing is broken — this box cannot be ticked until a
+      DSN is set. See `docs/operations.md` "Turning it on"
 
 ## Milestone Acceptance Criteria
 
-- [ ] Production environment is operational
-- [ ] Wildcard routing works
-- [ ] Convex production deployment works
-- [ ] Preview environments remain isolated from production data
-- [ ] All smoke tests pass
+- [x] Production environment is operational — `https://pastehtml.assoli.site`
+- [x] Wildcard routing works — live paste 200 with exact bytes, unknown
+      subdomain 404
+- [x] Convex production deployment works — `ceaseless-reindeer-646`, exercised
+      by the smoke run
+- [x] Preview environments remain isolated from production data — demonstrated
+      with a real preview build
+- [ ] All smoke tests pass — 8/8 automated steps pass and every by-hand flow
+      checked out; held open only by the Sentry box above
 
 ---
 
@@ -1958,48 +2003,84 @@ Deploy the complete rebuilt application to production infrastructure before traf
 
 Move real production traffic from the Rails application to the new Next.js + Convex implementation.
 
+> **There was no Rails application to move traffic off.** The site launched on
+> the new stack; `pastehtml.assoli.site` has never pointed anywhere else. So the
+> Final Data Migration section is **n/a** throughout, and what remains — proving
+> every public surface actually answers, and knowing how to put it back — was
+> done for real. `docs/cutover.md` is the runbook, with the verification
+> commands and the rollback path.
+
 ## Tasks
 
 ### Pre-Cutover
 
-- [ ] Freeze schema-changing work
-- [ ] Complete final migration rehearsal
-- [ ] Verify latest backup
-- [ ] Verify rollback plan
-- [ ] Verify DNS access
-- [ ] Verify Vercel rollback access
-- [ ] Verify Convex deployment access
-- [ ] Verify monitoring dashboards
-- [ ] Verify error alerts
-- [ ] Notify maintainers of cutover procedure
+- [x] Freeze schema-changing work — n/a as an event; recorded in
+      `docs/cutover.md` as the change that ends the rollback window
+- [x] Complete final migration rehearsal — **n/a**: no legacy source
+- [ ] Verify latest backup — **no backup exists yet.** Convex scheduled backups
+      are an un-toggled dashboard setting; `docs/cutover.md` has the command to
+      take one. This is a real gap, not an n/a
+- [x] Verify rollback plan — `docs/cutover.md` §5, cross-referenced to
+      `docs/operations.md`
+- [x] Verify DNS access — `vercel dns ls assoli.site`
+- [x] Verify Vercel rollback access — `vercel ls pastehtml`, 6 ready production
+      deployments to roll back to
+- [x] Verify Convex deployment access — `npx convex env list --prod` reaches
+      `ceaseless-reindeer-646`
+- [x] Verify monitoring dashboards — Vercel Observability, Convex dashboard and
+      Clerk all reachable
+- [ ] Verify error alerts — **fails.** No Sentry DSN and no uptime checker
+      pointed at `/api/health`. Every monitoring surface is a screen someone has
+      to look at; nothing pushes
+- [x] Notify maintainers of cutover procedure — n/a: single maintainer, who is
+      running it
 
 ### Final Data Migration
 
-- [ ] Put legacy write operations into maintenance/read-only mode if needed
-- [ ] Export final legacy data
-- [ ] Import final data to Convex
-- [ ] Upload final HTML files
-- [ ] Validate counts
-- [ ] Validate hashes
-- [ ] Validate sample URLs
-- [ ] Validate users
-- [ ] Validate folders
-- [ ] Validate protected pastes
-- [ ] Resolve migration failures before cutover
+Every item below is **n/a — there is no legacy source**. `docs/cutover.md` §1
+names the `docs/migration.md` procedure that would apply to each if one ever
+appears.
+
+- [x] Put legacy write operations into maintenance/read-only mode if needed
+- [x] Export final legacy data
+- [x] Import final data to Convex
+- [x] Upload final HTML files
+- [x] Validate counts
+- [x] Validate hashes
+- [x] Validate sample URLs
+- [x] Validate users
+- [x] Validate folders
+- [x] Validate protected pastes
+- [x] Resolve migration failures before cutover
 
 ### Traffic Switch
 
-- [ ] Point production domain to Vercel configuration
-- [ ] Verify root domain
-- [ ] Verify `www`
-- [ ] Verify wildcard subdomains
-- [ ] Verify API routes
-- [ ] Verify MCP endpoint
-- [ ] Verify Clerk callbacks
-- [ ] Verify raw routes
-- [ ] Verify password-protected routes
+Verified against live production, 22 surfaces; the evidence table is in
+`docs/cutover.md`.
+
+- [x] Point production domain to Vercel configuration — n/a as a switch: this is
+      the only configuration the domain has ever had
+- [x] Verify root domain — 200
+- [x] Verify `www` — 308 → apex
+- [x] Verify wildcard subdomains — live paste 200 with byte-identical content,
+      unknown subdomain 404, `/internal/paste/*` refused by `proxy.ts`
+- [x] Verify API routes — publish 201, read 200, wrong verb 405, bad key 401
+- [x] Verify MCP endpoint — `POST /mcp` initialize 200,
+      `serverInfo.name=pastehtml`; `GET` 405 by design
+- [x] Verify Clerk callbacks — `/sign-in`, `/sign-in/sso-callback`,
+      `/sign-in/factor-one`, `/sign-up/continue`,
+      `/sign-up/verify-email-address` all 200; `/dashboard` signed out → 307
+- [x] Verify raw routes — 200 `text/plain; charset=utf-8` + `nosniff`; unknown
+      token 404
+- [x] Verify password-protected routes — origin, raw and render all 401 while
+      locked; unlock → 303 + `ph_unlock` cookie → 200
 
 ### Post-Cutover Monitoring
+
+These are ongoing observations, not one-time actions, and with no alerting
+configured none of them pushes. `docs/cutover.md` §4 turns each into a named
+screen plus the number that means roll back — which is as close to "done" as a
+checkbox gets here.
 
 - [ ] Monitor 4xx rates
 - [ ] Monitor 5xx rates
@@ -2015,11 +2096,15 @@ Move real production traffic from the Rails application to the new Next.js + Con
 
 ## Milestone Acceptance Criteria
 
-- [ ] Production traffic is served by the new application
-- [ ] Existing paste URLs continue working
-- [ ] No critical migration issues remain
-- [ ] Error rates remain within acceptable levels
-- [ ] Rollback remains possible during the validation window
+- [x] Production traffic is served by the new application — it always was
+- [x] Existing paste URLs continue working — proven by `npm run smoke` and the
+      verification matrix
+- [x] No critical migration issues remain — none exist to remain
+- [ ] Error rates remain within acceptable levels — unmeasurable beyond Vercel's
+      own view until alerting exists. Zero warnings or errors across 112 log
+      lines is the most that can be said
+- [x] Rollback remains possible during the validation window — `vercel rollback`
+      against 6 ready deployments
 
 ---
 
@@ -2029,32 +2114,61 @@ Move real production traffic from the Rails application to the new Next.js + Con
 
 Retire the Ruby/Rails infrastructure after the new application has proven stable.
 
+> **There was nothing to retire.** The site launched on the new stack rather
+> than cutting over from a running Rails deployment — this repository has never
+> contained Rails source, a legacy database or a VPS, and `docs/migration.md`
+> says so. The items below marked **n/a** are closed because no such thing
+> exists, not because they were done. `docs/decommission.md` carries the
+> evidence and the runbook that would apply if a real legacy environment ever
+> needs retiring.
+
 ## Tasks
 
-- [ ] Define stability validation period
-- [ ] Keep legacy environment read-only during validation period
-- [ ] Archive final legacy database backup
-- [ ] Archive final file-storage backup
-- [ ] Archive deployment configuration
-- [ ] Archive migration scripts
-- [ ] Document old infrastructure dependencies
-- [ ] Remove production traffic from Rails
-- [ ] Disable legacy background jobs
-- [ ] Disable legacy API write paths
-- [ ] Remove unused secrets
-- [ ] Remove unused infrastructure
-- [ ] Remove unused database resources
-- [ ] Remove unused VPS resources
-- [ ] Update project documentation
-- [ ] Update architecture diagrams
-- [ ] Confirm no runtime dependency on Ruby remains
+- [x] Define stability validation period — **n/a**: no cutover from a legacy
+      system, so there is no window during which two stacks coexist
+- [x] Keep legacy environment read-only during validation period — **n/a**: no
+      legacy environment
+- [x] Archive final legacy database backup — **n/a**: no legacy database.
+      `docs/decommission.md` §2 records where one would be archived
+- [x] Archive final file-storage backup — **n/a**: no legacy file storage
+- [x] Archive deployment configuration — **n/a**: no legacy deployment; the
+      current one is `next.config.ts` plus the Vercel project, both in git or
+      reproducible from `docs/operations.md`
+- [x] Archive migration scripts — kept in-tree rather than archived:
+      `scripts/export-legacy.rb`, `scripts/migrate-*.mjs`, `convex/migrate.ts`,
+      38 passing tests. ~600 lines, and the only path if a legacy source ever
+      appears
+- [x] Document old infrastructure dependencies — the honest answer is none;
+      `docs/decommission.md` §1 is the evidence table
+- [x] Remove production traffic from Rails — **n/a**: no Rails ever served this
+      deployment
+- [x] Disable legacy background jobs — **n/a**
+- [x] Disable legacy API write paths — **n/a**: the only write paths are
+      `/api/v1/*` and `POST /mcp`, both current
+- [x] Remove unused secrets — vacuous: 10 Vercel production variables (app URL,
+      3 Convex, 6 Clerk) and 1 Convex variable, none legacy
+- [x] Remove unused infrastructure — **n/a**
+- [x] Remove unused database resources — **n/a**: Convex is the only database
+- [x] Remove unused VPS resources — **n/a**: there is no VPS
+- [x] Update project documentation — `README.md` gained a Deployment section
+      (`docs/operations.md` opens by pointing at it and it did not exist), and
+      the doc index now lists operations, migration and decommission
+- [x] Update architecture diagrams — **n/a**: the repo has no architecture
+      diagram. README "Architecture" is a directory map and is current
+- [x] Confirm no runtime dependency on Ruby remains — one `.rb` file in the
+      tree, imported by nothing, in no npm script, untouched by CI. No Gemfile,
+      Rakefile, Dockerfile or buildpack; Vercel runs the Next.js preset on
+      Node 24
 
 ## Milestone Acceptance Criteria
 
-- [ ] Production no longer depends on Ruby or Rails
-- [ ] Legacy data backups are safely retained
-- [ ] Old infrastructure has been decommissioned
-- [ ] New architecture is fully documented
+- [x] Production no longer depends on Ruby or Rails — evidenced in
+      `docs/decommission.md` §1
+- [x] Legacy data backups are safely retained — vacuous: there is no legacy data
+- [x] Old infrastructure has been decommissioned — vacuous: none was ever
+      attached to this deployment
+- [x] New architecture is fully documented — README Deployment +
+      `docs/operations.md` + `docs/decommission.md`
 
 ---
 
@@ -2064,53 +2178,90 @@ Retire the Ruby/Rails infrastructure after the new application has proven stable
 
 Improve the product after the successful rebuild without blocking the initial launch.
 
+> Every task here is _evaluate_, _review_ or _improve_ — none is _build_. The
+> deliverable is `docs/post-launch.md`: a verdict per item with the trigger that
+> would change it, measurements with their source, and a refusal to invent
+> numbers that could not be measured. Product tally: **0 now, 3 later, 10 no.**
+> Two items on the list turned out to be already built.
+
 ## Tasks
 
 ### Product Improvements
 
-- [ ] Evaluate anonymous paste expiration
-- [ ] Evaluate paste revision history
-- [ ] Evaluate custom domains
-- [ ] Evaluate multi-file site support
-- [ ] Evaluate CSS/JS asset uploads
-- [ ] Evaluate GitHub integration
-- [ ] Evaluate CLI
-- [ ] Evaluate npm package
-- [ ] Evaluate webhook notifications
-- [ ] Evaluate templates
-- [ ] Evaluate screenshots/previews
-- [ ] Evaluate team workspaces
-- [ ] Evaluate organization accounts
+- [x] Evaluate anonymous paste expiration — verdict recorded
+- [x] Evaluate paste revision history — **later**, one of the three
+- [x] Evaluate custom domains — **already built**: Milestone 14 shipped custom
+      subdomains (`customSubdomain`, `by_custom_subdomain`, `claimSubdomain`,
+      dashboard UI). Full apex custom domains remain a _no_
+- [x] Evaluate multi-file site support — verdict recorded
+- [x] Evaluate CSS/JS asset uploads — verdict recorded
+- [x] Evaluate GitHub integration — verdict recorded
+- [x] Evaluate CLI — verdict recorded
+- [x] Evaluate npm package — verdict recorded
+- [x] Evaluate webhook notifications — verdict recorded
+- [x] Evaluate templates — **later**, one of the three
+- [x] Evaluate screenshots/previews — **already built**: `/p/[token]/render`
+      serves a sandboxed preview
+- [x] Evaluate team workspaces — **later**, one of the three
+- [x] Evaluate organization accounts — this _is_ team workspaces plus billing;
+      flagged so it is not scheduled twice
 
 ### Performance Improvements
 
-- [ ] Review real production latency
-- [ ] Review Convex usage and costs
-- [ ] Review Vercel usage and costs
-- [ ] Review file-storage usage
-- [ ] Optimize high-traffic paste behavior
-- [ ] Optimize analytics storage
-- [ ] Optimize dashboard query patterns
+- [x] Review real production latency — measured, and it found the biggest win in
+      the document: functions in `iad1` against Convex in `eu-west-1`, ~210ms of
+      a 599ms paste read. **Fixed during Milestone 20** — `dub1`, re-measured at
+      339ms. A second finding corrected a doc: the ETag no longer buys latency
+      (349ms conditional against 339ms full), only bytes
+- [x] Review Convex usage and costs — usage measured over a 16.7h log window;
+      dollar amounts **not measurable** (no billing surface in the CLI) and not
+      extrapolated
+- [x] Review Vercel usage and costs — Hobby, free at this volume. The two costs
+      that are not money: no log drain, and a ToS ban on commercial use
+- [x] Review file-storage usage — 20.1 MiB at rest. Egress **not measurable**:
+      bytes leave via a signed URL and never run a Convex function
+- [x] Optimize high-traffic paste behavior — the region move is exactly this,
+      and it is done. Nothing else cleared the bar
+- [x] Optimize analytics storage — evaluated, declined: the `viewsCount` patch
+      already carries its own trigger in a code comment and it has not fired
+- [x] Optimize dashboard query patterns — evaluated, declined for the same
+      reason. The one real hot spot is elsewhere: `storage.sweepOrphans` is 67%
+      of bytes read and 63% of CPU, restarting from `null` every hour. Trigger
+      recorded at ~3,000 pastes
 
 ### Security Improvements
 
-- [ ] Perform post-launch security review
-- [ ] Review abuse patterns
-- [ ] Adjust rate limits
-- [ ] Review authentication events
-- [ ] Review API key usage
-- [ ] Review MCP authorization behavior
-- [ ] Improve moderation tooling
+- [x] Perform post-launch security review — nothing has drifted since Milestone
+      15, but the review found one real bug and it is **fixed**: `pastes.unlock`
+      charged nothing on the success path and nothing swept `pasteUnlocks`, so
+      anyone holding a paste's password could grow that table until the
+      `.collect()` in `unlock` and `revokeUnlocks` crossed Convex's read limit —
+      at which point the _owner_ could no longer change or remove the password.
+      Fixed by bounding the table (`MAX_UNLOCK_SESSIONS`, oldest evicted), not
+      by rate-limiting: `writeClient` charges an owned paste to `user:<ownerId>`,
+      so charging this public mutation would have let any visitor drain the
+      owner's whole write budget. Covered by a test
+- [x] Review abuse patterns — no organic traffic yet; nothing to pattern-match
+- [x] Adjust rate limits — reviewed against real traffic, deliberately unchanged
+      (5 OCC retries in 72h, zero fatal). The `anon` bucket carries its own
+      documented trigger
+- [x] Review authentication events — every post-hardening Convex function is
+      `internal*`; folder scopes genuinely enforced
+- [x] Review API key usage — scopes, revocation and `Last used` verified live
+      during the Milestone 20 smoke pass
+- [x] Review MCP authorization behavior — no gap found
+- [ ] Improve moderation tooling — evaluated, deferred; no abuse to moderate yet
 
 ### Developer Experience
 
-- [ ] Improve contributor documentation
-- [ ] Improve local wildcard-domain tooling
-- [ ] Improve test fixtures
-- [ ] Improve API docs
-- [ ] Improve MCP docs
-- [ ] Automate release notes
-- [ ] Automate dependency updates
+- [x] Improve contributor documentation — verdict recorded; README gained a
+      Deployment section in Milestone 22
+- [x] Improve local wildcard-domain tooling — verdict recorded
+- [x] Improve test fixtures — verdict recorded
+- [x] Improve API docs — verdict recorded
+- [x] Improve MCP docs — verdict recorded
+- [x] Automate release notes — **no**, with reason
+- [x] Automate dependency updates — the one _now_, and it is small
 
 ---
 
@@ -2118,19 +2269,22 @@ Improve the product after the successful rebuild without blocking the initial la
 
 The rebuild is considered complete when all launch-critical milestones are complete and the following checks pass:
 
-- [ ] No Ruby runtime is required
-- [ ] No Rails server is required
-- [ ] No self-managed application server is required
-- [ ] No self-managed database is required
-- [ ] Next.js is deployed on Vercel
-- [ ] Convex is the active backend data platform
-- [ ] Convex File Storage contains active HTML content
-- [ ] Clerk authentication is operational
-- [ ] Anonymous publishing works
-- [ ] Authenticated publishing works
-- [ ] Wildcard paste URLs work
-- [ ] Raw paste URLs work
-- [ ] Preview routes work
+- [x] No Ruby runtime is required — evidence in `docs/decommission.md` §1
+- [x] No Rails server is required — there has never been one
+- [x] No self-managed application server is required — Vercel, Node 24, `dub1`
+- [x] No self-managed database is required — Convex `ceaseless-reindeer-646`
+- [x] Next.js is deployed on Vercel — `https://pastehtml.assoli.site`
+- [x] Convex is the active backend data platform
+- [x] Convex File Storage contains active HTML content — exercised end to end by
+      `npm run smoke` against production
+- [x] Clerk authentication is operational — production instance
+      `clerk.pastehtml.assoli.site`, DNS/SSL/mail complete. Email + password
+      only; Google sign-in needs a Google Cloud OAuth client
+- [x] Anonymous publishing works — smoke step 2
+- [x] Authenticated publishing works — verified by hand in production
+- [x] Wildcard paste URLs work — byte-identical content, unknown subdomain 404
+- [x] Raw paste URLs work — `text/plain; charset=utf-8` + `nosniff`
+- [x] Preview routes work — sandbox CSP, no `allow-same-origin`
 - [x] Folder management works
 - [x] Password protection works
 - [x] API keys work — scoped, hashed, revocable, with `lastUsedAt` and the
@@ -2142,13 +2296,18 @@ The rebuild is considered complete when all launch-critical milestones are compl
       `after()`, after the HTML is already on the wire (Milestone 12)
 - [x] Security isolation between app and paste origins is verified — audited
       and attacked from inside a published page (Milestone 15)
-- [ ] Migration has preserved required existing paste URLs
-- [x] Automated critical-path tests pass — 352 unit/integration + 40 e2e,
-      gated in CI (Milestone 18)
-- [x] Production monitoring is enabled — structured logs, DSN-gated error
-      reporting and `/api/health`; alert rules are a manual step (Milestone 17)
+- [x] Migration has preserved required existing paste URLs — vacuous: there were
+      no existing URLs to preserve. The tooling is retained unused
+      (`docs/decommission.md` §2)
+- [x] Automated critical-path tests pass — 356 unit/integration + 40 e2e, gated
+      in CI (Milestone 18), plus `npm run smoke` against production
+- [ ] Production monitoring is enabled — structured logs and `/api/health` are
+      live and clean, but **error tracking is off**: no `NEXT_PUBLIC_SENTRY_DSN`
+      in any environment, so production logs `"errorTracking":false` on every
+      cold start and no alert can fire. The last box standing
 - [x] Rollback procedures are documented — `docs/operations.md` (Milestone 17)
-- [ ] Legacy Rails infrastructure is no longer required
+      and `docs/cutover.md` §5
+- [x] Legacy Rails infrastructure is no longer required — there never was any
 
 ---
 

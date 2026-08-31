@@ -63,6 +63,15 @@ the stored object (~120ms), plus single-digit milliseconds of Next. The whole
 point of the ETag is visible in the second line: **a conditional request costs
 half a full read** and never touches File Storage.
 
+> **That halving is local only — it does not survive contact with production.**
+> Measured against `pastehtml.assoli.site` after the Milestone 20 region move:
+> 339ms for a full read against 349ms for the 304, n=10 each, a difference
+> inside the noise. The storage fetch a 304 skips is CDN-fronted and cheap; the
+> Convex query it still makes is the whole cost. The ETag saves the bytes, not
+> the wait. Keep serving it — it is bandwidth, and browsers revalidate
+> unprompted — but do not budget latency against it. `docs/post-launch.md`
+> Finding B has the numbers.
+
 ### What this says about the cache policy
 
 Nothing is cached anywhere, on purpose (`lib/paste-http.ts`). A replacement, a
