@@ -20,7 +20,7 @@ export default function AppError({
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-4 p-6">
       <div
         role="alert"
-        className="border-border flex flex-col items-start gap-3 rounded-lg border p-6"
+        className="border-ink shadow-comic bg-card flex flex-col items-start gap-3 border-3 p-6"
       >
         <p className="font-medium">Something went wrong</p>
         <p className="text-muted-foreground text-sm">{errorMessage(error)}</p>

@@ -66,7 +66,7 @@ function PasteDetail({ token }: { token: string }) {
     return (
       <div
         aria-busy="true"
-        className="bg-muted h-64 animate-pulse rounded-lg"
+        className="border-ink bg-muted h-64 animate-pulse border-2"
       />
     );
 
@@ -97,7 +97,7 @@ function PasteDetail({ token }: { token: string }) {
           >
             ← All pastes
           </Link>
-          <h2 className="truncate text-lg font-semibold">
+          <h2 className="truncate text-2xl tracking-wide">
             {displayName(paste)}
           </h2>
         </div>
@@ -164,7 +164,7 @@ function PasteDetail({ token }: { token: string }) {
             onChange={(event) => setDraftTitle(event.target.value)}
             placeholder={paste.filename}
             aria-label="Paste title"
-            className="border-border focus-visible:border-ring focus-visible:ring-ring/50 h-8 flex-1 rounded-lg border px-2.5 text-sm outline-none focus-visible:ring-3"
+            className="border-ink shadow-comic-xs bg-background focus-visible:outline-hero-blue h-9 flex-1 border-2 px-2.5 text-sm outline-none focus-visible:outline-3 focus-visible:-outline-offset-1"
           />
           <Button
             type="submit"
@@ -203,7 +203,7 @@ function PasteDetail({ token }: { token: string }) {
             value={paste.folderId ?? ""}
             disabled={busy}
             aria-label="Folder"
-            className="border-border focus-visible:border-ring focus-visible:ring-ring/50 h-8 rounded-lg border bg-transparent px-2 text-sm outline-none focus-visible:ring-3"
+            className="border-ink shadow-comic-xs bg-background focus-visible:outline-hero-blue h-9 border-2 px-2.5 text-sm outline-none focus-visible:outline-3 focus-visible:-outline-offset-1"
             onChange={(event) => {
               const value = event.target.value;
               void run(() =>
@@ -249,7 +249,7 @@ function PasteDetail({ token }: { token: string }) {
             onChange={(event) => setPasswordDraft(event.target.value)}
             placeholder={paste.hasPassword ? "New password" : "Password"}
             aria-label={paste.hasPassword ? "New password" : "Password"}
-            className="border-border focus-visible:border-ring focus-visible:ring-ring/50 h-8 flex-1 rounded-lg border px-2.5 text-sm outline-none focus-visible:ring-3"
+            className="border-ink shadow-comic-xs bg-background focus-visible:outline-hero-blue h-9 flex-1 border-2 px-2.5 text-sm outline-none focus-visible:outline-3 focus-visible:-outline-offset-1"
           />
           <Button type="submit" size="sm" disabled={busy || password === ""}>
             {paste.hasPassword ? "Change password" : "Enable password"}
@@ -284,7 +284,7 @@ function PasteDetail({ token }: { token: string }) {
           src={urls.renderUrl}
           title="Paste preview"
           sandbox="allow-scripts allow-forms"
-          className="border-border h-96 w-full rounded-lg border bg-white"
+          className="border-ink shadow-comic-sm h-96 w-full border-3 bg-white"
         />
       </Section>
     </div>

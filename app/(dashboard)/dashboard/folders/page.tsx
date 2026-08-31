@@ -64,7 +64,7 @@ function FolderList() {
           onChange={(event) => setName(event.target.value)}
           placeholder="New folder name"
           aria-label="New folder name"
-          className="border-border focus-visible:border-ring focus-visible:ring-ring/50 h-8 flex-1 rounded-lg border px-2.5 text-sm outline-none focus-visible:ring-3"
+          className="border-ink shadow-comic-xs bg-background focus-visible:outline-hero-blue h-9 flex-1 border-2 px-2.5 text-sm outline-none focus-visible:outline-3 focus-visible:-outline-offset-1"
         />
         <Button type="submit" size="sm" disabled={!name.trim()}>
           Create folder
@@ -89,7 +89,7 @@ function FolderList() {
           {folders.map((folder) => (
             <li
               key={folder._id}
-              className="border-border flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
+              className="border-ink shadow-comic-sm bg-card flex flex-col gap-3 border-3 p-4 sm:flex-row sm:items-center sm:justify-between"
             >
               <Link
                 href={`/dashboard/folders/${folder._id}`}

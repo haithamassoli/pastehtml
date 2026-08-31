@@ -36,7 +36,7 @@ export default function Unprocessable() {
         The upload arrived intact but broke one of the rules below. Nothing was
         stored, so fixing it and publishing again is safe.
       </p>
-      <dl className="border-border flex flex-col gap-3 rounded-lg border p-4 text-left text-sm">
+      <dl className="border-ink shadow-comic-sm bg-card flex flex-col gap-3 border-3 p-4 text-left text-sm">
         <Rule label="Size">
           At most {Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB.
         </Rule>

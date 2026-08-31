@@ -1,8 +1,8 @@
 import type { MetadataRoute } from "next";
 
-// Brand ink, and the tile behind every icon. Also the `theme_color`, so an
-// installed window's chrome matches the icon it was launched from.
-export const THEME_COLOR = "#171717";
+// The paper the whole design is printed on. Also the `theme_color`, so an
+// installed window's chrome matches the page it opens onto.
+export const THEME_COLOR = "#fff8ec";
 
 /**
  * Only the app host serves this: `proxy.ts` answers anything but `/` on a paste
@@ -23,7 +23,7 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     scope: "/",
     display: "standalone",
-    background_color: "#ffffff",
+    background_color: "#fff8ec",
     theme_color: THEME_COLOR,
     categories: ["developer", "productivity", "utilities"],
     icons: [

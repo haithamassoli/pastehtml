@@ -39,8 +39,8 @@ export default function DashboardPage() {
   );
 }
 
-const SELECT_CLASS =
-  "border-border focus-visible:border-ring focus-visible:ring-ring/50 h-8 rounded-lg border bg-transparent px-2 text-sm outline-none focus-visible:ring-3";
+const FIELD_CLASS =
+  "border-ink shadow-comic-xs bg-background focus-visible:outline-hero-blue h-9 border-2 px-2.5 text-sm outline-none focus-visible:outline-3 focus-visible:-outline-offset-1";
 
 function PasteList() {
   // Live subscriptions: a publish, an edit, a view or a delete from anywhere
@@ -83,7 +83,7 @@ function PasteList() {
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search pastes"
           aria-label="Search pastes"
-          className="border-border focus-visible:border-ring focus-visible:ring-ring/50 h-8 flex-1 rounded-lg border px-2.5 text-sm outline-none focus-visible:ring-3"
+          className={`${FIELD_CLASS} flex-1`}
         />
         {/* Stays out of the way until the account actually has a folder. */}
         {folders && folders.length > 0 && (
@@ -91,7 +91,7 @@ function PasteList() {
             value={folder}
             onChange={(event) => setFolder(event.target.value)}
             aria-label="Filter by folder"
-            className={SELECT_CLASS}
+            className={FIELD_CLASS}
           >
             <option value="all">All folders</option>
             <option value="none">No folder</option>
@@ -106,7 +106,7 @@ function PasteList() {
           value={sort}
           onChange={(event) => setSort(event.target.value as SortKey)}
           aria-label="Sort pastes"
-          className={SELECT_CLASS}
+          className={FIELD_CLASS}
         >
           {SORT_KEYS.map((key) => (
             <option key={key} value={key}>
@@ -117,7 +117,10 @@ function PasteList() {
       </div>
 
       {error && (
-        <p role="alert" className="text-destructive text-sm">
+        <p
+          role="alert"
+          className="border-ink shadow-comic-xs bg-hero-red border-2 px-3 py-2 text-sm font-semibold text-white"
+        >
           {error}
         </p>
       )}
@@ -134,22 +137,22 @@ function PasteList() {
             return (
               <li
                 key={paste.token}
-                className="border-border flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
+                className="border-ink shadow-comic-sm bg-card flex flex-col gap-3 border-3 border-l-8 p-4 sm:flex-row sm:items-center sm:justify-between [&:nth-child(4n+1)]:border-l-[var(--hero-red)] [&:nth-child(4n+2)]:border-l-[var(--hero-blue)] [&:nth-child(4n+3)]:border-l-[var(--hero-yellow)]"
               >
                 <div className="flex min-w-0 flex-col gap-1">
                   <Link
                     href={`/dashboard/pastes/${paste.token}`}
-                    className="truncate font-medium underline-offset-4 hover:underline"
+                    className="font-display truncate text-2xl tracking-wide underline-offset-4 hover:underline"
                   >
                     {name}
                   </Link>
                   <a
                     href={publicUrl}
-                    className="text-muted-foreground truncate font-mono text-xs underline-offset-4 hover:underline"
+                    className="text-hero-blue truncate font-mono text-xs font-medium underline-offset-4 hover:underline"
                   >
                     {publicUrl}
                   </a>
-                  <p className="text-muted-foreground text-xs">
+                  <p className="text-muted-foreground font-mono text-[11px] tracking-[0.05em] uppercase">
                     {paste.viewsCount} views · created{" "}
                     {isoDate(paste.createdAt)} · updated{" "}
                     {isoDate(paste.updatedAt)}
@@ -176,12 +179,12 @@ function PasteList() {
 
 function Empty() {
   return (
-    <div className="border-border flex flex-col items-start gap-3 rounded-lg border border-dashed p-8">
-      <p className="font-medium">No pastes yet</p>
+    <div className="border-ink shadow-comic bg-card flex flex-col items-start gap-3 border-3 border-dashed p-8">
+      <p className="font-display text-3xl tracking-wide">No pastes yet</p>
       <p className="text-muted-foreground text-sm">
         Publish some HTML and it shows up here the moment it exists.
       </p>
-      <Link href="/" className={buttonVariants({ size: "sm" })}>
+      <Link href="/" className={buttonVariants()}>
         Publish HTML
       </Link>
     </div>

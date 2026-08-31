@@ -3,14 +3,32 @@
 @import "shadcn/tailwind.css";
 @import "@clerk/ui/themes/shadcn.css";
 
-@custom-variant dark (&:is(.dark *));
+/* Comic book / neo-brutalist: warm newsprint under a Ben-Day dot screen, ink
+   borders, hard offset shadows, no radius anywhere. Every shadcn token below
+   is remapped onto that palette, so components that never mention a colour —
+   Clerk's, the buttons, the dashboard — come along without being touched. */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-thmanyah-sans);
-  --font-mono: ui-monospace, monospace;
-  --font-heading: var(--font-sans);
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  /* Bangers is Latin-only; Arabic falls through to the body sans. */
+  --font-display:
+    var(--font-bangers), var(--font-thmanyah-sans), Impact, "Haettenschweiler",
+    sans-serif;
+  --font-heading: var(--font-display);
+
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-hero-red: var(--hero-red);
+  --color-hero-yellow: var(--hero-yellow);
+  --color-hero-blue: var(--hero-blue);
+
+  --shadow-comic: 8px 8px 0 0 var(--ink);
+  --shadow-comic-sm: 4px 4px 0 0 var(--ink);
+  --shadow-comic-xs: 2px 2px 0 0 var(--ink);
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -40,82 +58,111 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* Comics have no rounded corners. Kept as a scale so the shadcn utilities
+     that reference each step still resolve — they all resolve to zero. */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --radius-4xl: 0px;
 }
 
+/* One theme, on purpose: the halftone paper is the identity, and a dark
+   inversion of it is a different design rather than the same one at night.
+   `colorScheme: "light"` in the root layout tells the browser as much, so
+   form controls and scrollbars match rather than fighting it. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --ink: #18120e;
+  --paper: #fff8ec;
+  --hero-red: #e62429;
+  --hero-yellow: #ffd400;
+  --hero-blue: #0072ce;
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: #ffffff;
+  --card-foreground: var(--ink);
+  --popover: #ffffff;
+  --popover-foreground: var(--ink);
+  /* Red is the publish colour — the one thing on any page that ships. */
+  --primary: var(--hero-red);
+  --primary-foreground: #ffffff;
+  --secondary: var(--hero-yellow);
+  --secondary-foreground: var(--ink);
+  --muted: #f6ecd8;
+  --muted-foreground: rgb(24 18 14 / 0.66);
+  --accent: var(--hero-yellow);
+  --accent-foreground: var(--ink);
+  --destructive: var(--hero-red);
+  /* Ink, not grey: every border on the page is drawn, not implied. */
+  --border: var(--ink);
+  /* Clerk's shadcn theme fills a text field with `--input`, so this is a
+     surface colour, not the border colour its name suggests. Ink here paints
+     a solid black box where the email field should be. */
+  --input: #ffffff;
+  --ring: var(--hero-blue);
+  --chart-1: var(--hero-red);
+  --chart-2: var(--hero-blue);
+  --chart-3: var(--hero-yellow);
+  --chart-4: var(--ink);
+  --chart-5: rgb(24 18 14 / 0.45);
+  --radius: 0px;
+  --sidebar: var(--paper);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--hero-red);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--hero-yellow);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--ink);
+  --sidebar-ring: var(--hero-blue);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+/* Comic paper: warm page, two colour washes, a faint halftone dot screen.
+   The dots scroll with the page — pinning them to the viewport puts a hard
+   seam across any page taller than one screen. */
+@utility bg-paper {
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(circle at 22% 6%, rgb(255 212 0 / 0.24), transparent 38%),
+    radial-gradient(circle at 88% 62%, rgb(0 114 206 / 0.14), transparent 40%),
+    radial-gradient(circle, rgb(24 18 14 / 0.09) 1px, transparent 1.5px);
+  background-size:
+    auto,
+    auto,
+    12px 12px;
+}
+
+/* Ben-Day dot fill for panel corners. Takes its colour from `currentColor`. */
+@utility bg-halftone {
+  background-image: radial-gradient(
+    circle,
+    currentColor 1.3px,
+    transparent 1.8px
+  );
+  background-size: 9px 9px;
+}
+
+/* Comic headline: ink fill, hard paper-then-red offset. The offset grows at
+   the larger breakpoint so wrapped lines never collide with the line below. */
+@utility text-kapow {
+  text-shadow:
+    2px 2px 0 var(--paper),
+    3px 3px 0 var(--hero-red);
+
+  @variant sm {
+    text-shadow:
+      2px 2px 0 var(--paper),
+      5px 5px 0 var(--hero-red);
+  }
+}
+
+/* The panel: the page's one container. Ink border, hard shadow, no radius. */
+@utility panel {
+  border: 3px solid var(--ink);
+  background: var(--card);
+  box-shadow: var(--shadow-comic);
 }
 
 @layer base {
@@ -123,7 +170,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-paper text-foreground;
   }
   html {
     @apply font-sans;
@@ -134,6 +181,32 @@
   h4,
   h5,
   h6 {
-    font-feature-settings: "salt" 1;
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: 0.025em;
+    line-height: 0.98;
+  }
+  ::selection {
+    background: var(--hero-yellow);
+    color: var(--ink);
+  }
+  /* iOS Safari zooms the viewport when a focused field's text is under 16px.
+     Hold every text-entry control at 16px on small screens so focusing one
+     never zooms; the design's smaller sizes still apply from `sm` up. */
+  @media (max-width: 639.98px) {
+    input:not(
+      [type="button"],
+      [type="submit"],
+      [type="reset"],
+      [type="checkbox"],
+      [type="radio"],
+      [type="file"],
+      [type="range"],
+      [type="color"]
+    ),
+    select,
+    textarea {
+      font-size: 16px;
+    }
   }
 }

@@ -61,7 +61,7 @@ export function CustomSubdomain({
     <section className="flex flex-col gap-2">
       <h3 className="text-sm font-medium">Custom subdomain</h3>
       {current ? (
-        <div className="border-border flex items-center gap-2 rounded-lg border p-2">
+        <div className="border-ink shadow-comic-xs bg-background flex items-center gap-2 border-2 p-2">
           <a
             href={pasteUrls(current).publicUrl}
             className="flex-1 truncate font-mono text-sm underline-offset-4 hover:underline"
@@ -91,7 +91,7 @@ export function CustomSubdomain({
           aria-label="Custom subdomain"
           autoCapitalize="none"
           spellCheck={false}
-          className="border-border focus-visible:border-ring focus-visible:ring-ring/50 h-8 flex-1 rounded-lg border px-2.5 font-mono text-sm outline-none focus-visible:ring-3"
+          className="border-ink shadow-comic-xs bg-background focus-visible:outline-hero-blue h-9 flex-1 border-2 px-2.5 font-mono text-sm outline-none focus-visible:outline-3 focus-visible:-outline-offset-1"
         />
         <Button
           type="submit"

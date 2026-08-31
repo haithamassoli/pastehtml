@@ -15,7 +15,7 @@ import { CopyButton } from "@/components/copy-button";
 import { errorMessage } from "@/lib/errors";
 
 const inputClass =
-  "border-border focus-visible:border-ring focus-visible:ring-ring/50 h-8 rounded-lg border px-2.5 text-sm outline-none focus-visible:ring-3";
+  "border-ink shadow-comic-xs bg-background focus-visible:outline-hero-blue h-9 border-2 px-2.5 text-sm outline-none focus-visible:outline-3 focus-visible:-outline-offset-1";
 
 const date = (value: number) => new Date(value).toLocaleDateString();
 
@@ -69,7 +69,7 @@ function ApiKeyList() {
           right below it, where a modal would have had to hand it over on the
           way out. */}
       <form
-        className="border-border flex flex-col gap-3 rounded-lg border p-4"
+        className="border-ink shadow-comic-sm bg-card flex flex-col gap-3 border-3 p-4"
         onSubmit={(event) => {
           event.preventDefault();
           void run(async () => {
@@ -144,12 +144,12 @@ function ApiKeyList() {
       )}
 
       {secret && (
-        <div className="border-border flex flex-col gap-2 rounded-lg border p-4">
+        <div className="border-ink shadow-comic-sm bg-card flex flex-col gap-2 border-3 p-4">
           <p className="text-sm font-medium">
             Copy this key now — it is never shown again.
           </p>
           <div className="flex items-center gap-2">
-            <code className="bg-muted flex-1 overflow-x-auto rounded-lg p-2 text-xs">
+            <code className="border-ink bg-ink text-paper flex-1 overflow-x-auto border-2 p-2 text-xs">
               {secret}
             </code>
             <CopyButton value={secret} label="Copy key" />
@@ -175,7 +175,7 @@ function ApiKeyList() {
             return (
               <li
                 key={key._id}
-                className="border-border flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
+                className="border-ink shadow-comic-sm bg-card flex flex-col gap-3 border-3 p-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className={dead ? "opacity-60" : undefined}>
                   <p className="font-medium">

@@ -36,28 +36,34 @@ export default async function PastePage({ params }: PageProps<"/p/[token]">) {
   const urls = pasteUrls(paste.token);
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 p-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
+    <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 px-4 py-6 sm:px-8">
+      <section className="panel bg-background relative overflow-clip p-6 sm:p-8">
+        <span
+          aria-hidden
+          className="bg-halftone pointer-events-none absolute -right-6 -bottom-6 size-32 text-[#0072ce]/25"
+        />
+        <h1 className="text-4xl tracking-wide sm:text-5xl">
           {paste.title || paste.filename}
         </h1>
         {paste.description && (
-          <p className="text-muted-foreground">{paste.description}</p>
+          <p className="text-muted-foreground mt-3 max-w-[58ch]">
+            {paste.description}
+          </p>
         )}
-      </div>
 
-      <dl className="text-muted-foreground grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
-        <Fact label="Filename" value={paste.filename} />
-        <Fact label="Size" value={sizeLabel(paste.contentLength)} />
-        <Fact label="Views" value={String(paste.viewsCount)} />
-        <Fact label="Published" value={isoDate(paste.createdAt)} />
-      </dl>
+        <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Fact label="Filename" value={paste.filename} />
+          <Fact label="Size" value={sizeLabel(paste.contentLength)} />
+          <Fact label="Views" value={String(paste.viewsCount)} />
+          <Fact label="Published" value={isoDate(paste.createdAt)} />
+        </dl>
 
-      <div className="flex flex-col gap-4">
-        <UrlRow label="Public URL" value={urls.publicUrl} />
-        <UrlRow label="Raw URL" value={urls.rawUrl} />
-        <UrlRow label="Preview" value={urls.renderUrl} />
-      </div>
+        <div className="border-ink/15 mt-7 flex flex-col gap-5 border-t-2 pt-7">
+          <UrlRow label="Public URL" value={urls.publicUrl} />
+          <UrlRow label="Raw URL" value={urls.rawUrl} />
+          <UrlRow label="Preview" value={urls.renderUrl} />
+        </div>
+      </section>
 
       <OwnerControls token={paste.token} />
     </main>

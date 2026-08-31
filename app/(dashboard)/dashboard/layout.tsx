@@ -21,30 +21,40 @@ export default async function DashboardLayout({
   if (!userId) redirect("/sign-in");
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Dashboard</h1>
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-6 sm:px-8">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="border-ink shadow-comic-xs bg-hero-yellow inline-block -rotate-1 border-2 px-2.5 py-1 font-mono text-[11px] font-semibold tracking-[0.16em] uppercase">
+            Your pastes
+          </p>
+          <h1 className="text-kapow mt-3 text-4xl tracking-wide sm:text-5xl">
+            Dashboard
+          </h1>
+        </div>
         {/* The account menu itself is Clerk's `UserButton` in the root header,
             which is present on every page including this one. */}
-        <Link href="/" className={buttonVariants({ size: "sm" })}>
+        <Link href="/" className={buttonVariants()}>
           New paste
         </Link>
       </div>
       {/* Scrolls rather than wraps on a narrow screen, which is the whole of
           the mobile navigation. */}
-      <nav className="border-border flex gap-4 overflow-x-auto border-b pb-2 text-sm">
-        <Link href="/dashboard" className="font-medium whitespace-nowrap">
+      <nav className="flex gap-2.5 overflow-x-auto pb-2">
+        <Link
+          href="/dashboard"
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
           Pastes
         </Link>
         <Link
           href="/dashboard/folders"
-          className="font-medium whitespace-nowrap"
+          className={buttonVariants({ variant: "outline", size: "sm" })}
         >
           Folders
         </Link>
         <Link
           href="/dashboard/settings/api-keys"
-          className="font-medium whitespace-nowrap"
+          className={buttonVariants({ variant: "outline", size: "sm" })}
         >
           API keys
         </Link>

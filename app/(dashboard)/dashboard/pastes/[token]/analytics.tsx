@@ -23,7 +23,7 @@ export function PasteAnalytics({ token }: { token: string }) {
     return (
       <div
         aria-busy="true"
-        className="bg-muted h-48 animate-pulse rounded-lg"
+        className="border-ink bg-muted h-48 animate-pulse border-2"
       />
     );
 
@@ -93,7 +93,9 @@ function Stat({ label, value }: { label: string; value: number }) {
       <dt className="text-muted-foreground text-xs tracking-wide uppercase">
         {label}
       </dt>
-      <dd className="text-2xl font-semibold tabular-nums">{value}</dd>
+      <dd className="font-display text-3xl tracking-wide tabular-nums">
+        {value}
+      </dd>
     </div>
   );
 }

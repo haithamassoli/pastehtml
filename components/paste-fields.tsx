@@ -6,12 +6,14 @@ import { CopyButton } from "@/components/copy-button";
 /** A paste URL with its copy button. Cross-origin, so a plain anchor. */
 export function UrlRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium">{label}</p>
-      <div className="border-border flex items-center gap-2 rounded-lg border p-2">
+    <div className="flex max-w-3xl flex-col gap-1.5">
+      <p className="font-display text-lg tracking-wide">{label}</p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+        {/* Scrolls inside its own box: a long token URL must never widen the
+            page, and truncating one you are about to copy by eye is worse. */}
         <a
           href={value}
-          className="flex-1 truncate font-mono text-sm underline-offset-4 hover:underline"
+          className="border-ink shadow-comic-xs bg-background hover:bg-card flex min-w-0 flex-1 items-center overflow-x-auto border-2 px-3 py-2 font-mono text-sm whitespace-nowrap"
         >
           {value}
         </a>
@@ -24,9 +26,11 @@ export function UrlRow({ label, value }: { label: string; value: string }) {
 /** One `<dt>/<dd>` pair. Belongs inside a `<dl>`. */
 export function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col">
-      <dt className="text-xs tracking-wide uppercase">{label}</dt>
-      <dd className="text-foreground truncate font-medium">{value}</dd>
+    <div className="border-ink shadow-comic-xs bg-background min-w-0 border-2 px-3 py-2">
+      <dt className="font-mono text-[10px] font-semibold tracking-[0.14em] uppercase opacity-60">
+        {label}
+      </dt>
+      <dd className="font-display truncate text-xl tracking-wide">{value}</dd>
     </div>
   );
 }
@@ -38,7 +42,7 @@ export function Skeleton({ rows = 2, className = "h-16" }) {
       {Array.from({ length: rows }, (_, row) => (
         <div
           key={row}
-          className={`bg-muted animate-pulse rounded-lg ${className}`}
+          className={`border-ink bg-muted animate-pulse border-2 ${className}`}
         />
       ))}
     </div>

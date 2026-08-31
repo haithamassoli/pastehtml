@@ -15,17 +15,25 @@ export function StatusPage({
   actions?: React.ReactNode;
 }) {
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-3 p-6 text-center">
-      <p className="text-muted-foreground font-mono text-sm">{code}</p>
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-      <div className="text-muted-foreground flex flex-col gap-3">
-        {children}
-      </div>
-      <div className="mt-3 flex flex-wrap justify-center gap-3">
-        <Link href="/" className={buttonVariants()}>
-          Publish something
-        </Link>
-        {actions}
+    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-4 py-10 sm:px-8">
+      <div className="panel bg-background relative overflow-clip p-7 text-center">
+        <span
+          aria-hidden
+          className="bg-halftone pointer-events-none absolute -top-6 -left-6 size-32 text-[#e62429]/25"
+        />
+        <p className="font-display text-hero-red text-6xl tracking-wide sm:text-7xl">
+          {code}
+        </p>
+        <h1 className="mt-2 text-3xl tracking-wide sm:text-4xl">{title}</h1>
+        <div className="text-muted-foreground mt-3 flex flex-col gap-3 text-sm">
+          {children}
+        </div>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Link href="/" className={buttonVariants()}>
+            Publish something
+          </Link>
+          {actions}
+        </div>
       </div>
     </main>
   );

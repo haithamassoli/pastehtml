@@ -48,7 +48,7 @@ function FolderDetail({ folderId }: { folderId: Id<"folders"> }) {
     return (
       <div
         aria-busy="true"
-        className="bg-muted h-40 animate-pulse rounded-lg"
+        className="border-ink bg-muted h-40 animate-pulse border-2"
       />
     );
 
@@ -61,7 +61,7 @@ function FolderDetail({ folderId }: { folderId: Id<"folders"> }) {
         >
           ← All folders
         </Link>
-        <h2 className="truncate text-lg font-semibold">{folder.name}</h2>
+        <h2 className="truncate text-2xl tracking-wide">{folder.name}</h2>
       </div>
 
       {error && (
@@ -81,7 +81,7 @@ function FolderDetail({ folderId }: { folderId: Id<"folders"> }) {
             return (
               <li
                 key={paste.token}
-                className="border-border flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
+                className="border-ink shadow-comic-sm bg-card flex flex-col gap-3 border-3 p-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="flex min-w-0 flex-col gap-1">
                   <Link
