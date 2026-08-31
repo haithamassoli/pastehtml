@@ -1,7 +1,41 @@
-# pastehtml.assoli.site
+<p align="center">
+  <img src="docs/images/og-card.png" alt="pastehtml.assoli.site — publish HTML, get a URL" width="820">
+</p>
 
-Publish HTML and get an instant public URL. Rebuild on Next.js + Convex + Clerk,
-deployed to Vercel.
+<h1 align="center">pastehtml.assoli.site</h1>
+
+<p align="center">
+  Drop an HTML file, get a public URL on its own origin. No account, no build step.<br>
+  <a href="https://pastehtml.assoli.site">pastehtml.assoli.site</a> · <a href="docs/api.md">REST API</a> · <a href="docs/mcp.md">MCP</a>
+</p>
+
+---
+
+## What it does
+
+- **Publish in one step** — drop a file, paste markup, `curl` it, or hand it to an
+  agent over MCP. Every route ends at the same Convex function.
+- **Its own origin per paste** — `<token>.pastehtml.assoli.site`, so uploaded HTML
+  never shares an origin with the dashboard or a Clerk session.
+- **Optional account** — publish anonymously, then claim the paste later with the
+  update token it handed you.
+- **Password-protected pastes** — PBKDF2 in Convex, unlock sessions scoped to the
+  one subdomain, attempts throttled per client.
+- **API keys and scopes** — `ph_…` bearer keys for the REST API and the MCP server,
+  enforced inside Convex rather than at the edge.
+- **Three managed services, no fourth** — Vercel, Convex, Clerk. No VM, no database
+  to run.
+
+<p align="center">
+  <img src="docs/images/home.png" alt="The home page: drop zone, paste box, and the curl one-liner" width="820">
+</p>
+
+Publishing returns a page with every URL the paste answers on — the public origin,
+the raw source, and a sandboxed preview:
+
+<p align="center">
+  <img src="docs/images/paste-page.png" alt="A published paste's page, showing its public, raw and preview URLs" width="820">
+</p>
 
 ## Stack
 
@@ -253,8 +287,11 @@ protection) from the keys in `.env.local`. Override the fixture address with
 `app/layout.tsx` holds the site-wide `metadata` — title template, description,
 canonical, Open Graph and Twitter card — with `metadataBase` taken from
 `NEXT_PUBLIC_APP_URL`, so a preview deployment advertises itself rather than
-production. The card image is generated at `app/opengraph-image.tsx` through
-`next/og`, so the pitch on it lives in one place instead of in a committed PNG.
+production. The card image is drawn at `app/opengraph-image.tsx` through
+`next/og` — the comic panel, the burst and the site's own fonts, read from
+`public/fonts/*.ttf` (Satori has no woff2) — so the pitch on it lives in one
+place instead of in a committed PNG. `app/twitter-image.tsx` re-exports it: X's
+card is the same 1200x630 crop.
 
 `app/manifest.ts`, `app/icon.svg`, `app/apple-icon.png` and `public/icon-*.png`
 make the app installable; `public/sw.js` is a hand-written service worker (~40
