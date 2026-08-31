@@ -8,15 +8,21 @@ export function StatusPage({
   title,
   children,
   actions,
+  role,
 }: {
   code: string;
   title: string;
   children: React.ReactNode;
   actions?: React.ReactNode;
+  /** `"alert"` on the error boundary, so a screen reader is told on arrival. */
+  role?: "alert";
 }) {
   return (
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-4 py-10 sm:px-8">
-      <div className="panel bg-background relative overflow-clip p-7 text-center">
+      <div
+        role={role}
+        className="panel bg-background relative overflow-clip p-7 text-center"
+      >
         <span
           aria-hidden
           className="bg-halftone pointer-events-none absolute -top-6 -left-6 size-32 text-[#e62429]/25"
