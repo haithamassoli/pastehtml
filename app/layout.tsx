@@ -27,10 +27,10 @@ const DESCRIPTION =
  * It comes from `NEXT_PUBLIC_APP_URL`, so a preview deployment advertises
  * itself rather than production.
  *
- * The Open Graph image itself is `app/opengraph-image.tsx`; Next discovers it
- * by convention and fills in `og:image` and its dimensions, so nothing here
- * names it. X falls back to `og:image` when `twitter:image` is absent, so the
- * card only has to declare its shape.
+ * The card image itself is `app/opengraph-image.tsx`, with
+ * `app/twitter-image.tsx` re-exporting it; Next discovers both by convention
+ * and fills in `og:image`, `twitter:image` and their dimensions, so nothing
+ * here names them. The card only has to declare its shape.
  */
 export const metadata: Metadata = {
   metadataBase: new URL(config.appUrl),

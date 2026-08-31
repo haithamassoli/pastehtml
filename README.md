@@ -253,8 +253,11 @@ protection) from the keys in `.env.local`. Override the fixture address with
 `app/layout.tsx` holds the site-wide `metadata` — title template, description,
 canonical, Open Graph and Twitter card — with `metadataBase` taken from
 `NEXT_PUBLIC_APP_URL`, so a preview deployment advertises itself rather than
-production. The card image is generated at `app/opengraph-image.tsx` through
-`next/og`, so the pitch on it lives in one place instead of in a committed PNG.
+production. The card image is drawn at `app/opengraph-image.tsx` through
+`next/og` — the comic panel, the burst and the site's own fonts, read from
+`public/fonts/*.ttf` (Satori has no woff2) — so the pitch on it lives in one
+place instead of in a committed PNG. `app/twitter-image.tsx` re-exports it: X's
+card is the same 1200x630 crop.
 
 `app/manifest.ts`, `app/icon.svg`, `app/apple-icon.png` and `public/icon-*.png`
 make the app installable; `public/sw.js` is a hand-written service worker (~40
