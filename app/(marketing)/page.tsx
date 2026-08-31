@@ -302,7 +302,7 @@ function ApiExample() {
       <p className="text-muted-foreground text-sm">
         Returns the public URL and an update token.{" "}
         <a
-          href="https://github.com/goldentik/pastehtml/blob/main/docs/api.md"
+          href="https://github.com/haithamassoli/pastehtml/blob/main/docs/api.md"
           className="text-hero-blue font-semibold underline decoration-2 underline-offset-4"
         >
           API reference

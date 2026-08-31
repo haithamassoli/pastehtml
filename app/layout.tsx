@@ -125,7 +125,7 @@ function Header() {
         href="/"
         className="border-ink shadow-comic-sm font-display bg-card inline-block -rotate-1 border-3 px-3 pt-2 pb-1 text-2xl tracking-wide sm:text-3xl"
       >
-        pastehtml<span className="text-hero-red">.com</span>
+        pastehtml<span className="text-hero-red">.assoli.site</span>
       </Link>
       <nav className="flex items-center gap-2.5" aria-label="Account">
         <Show when="signed-out">
@@ -176,7 +176,7 @@ function Footer() {
       <div className="border-ink shadow-comic bg-ink text-paper flex flex-wrap items-center justify-between gap-4 border-3 px-5 py-5 sm:px-6">
         <div>
           <p className="font-display text-paper text-2xl tracking-wide">
-            pastehtml<span className="text-hero-red">.com</span>
+            pastehtml<span className="text-hero-red">.assoli.site</span>
           </p>
           <p className="text-paper/60 mt-1 text-sm">Publish HTML, get a URL.</p>
         </div>
@@ -185,13 +185,13 @@ function Footer() {
           className="flex flex-wrap gap-2 font-mono text-xs font-semibold tracking-[0.1em] uppercase"
         >
           <a
-            href="https://github.com/goldentik/pastehtml/blob/main/docs/api.md"
+            href="https://github.com/haithamassoli/pastehtml/blob/main/docs/api.md"
             className="border-paper hover:bg-hero-yellow hover:border-hero-yellow hover:text-ink border-2 px-2.5 py-1.5"
           >
             API
           </a>
           <a
-            href="https://github.com/goldentik/pastehtml"
+            href="https://github.com/haithamassoli/pastehtml"
             className="border-paper hover:bg-hero-yellow hover:border-hero-yellow hover:text-ink border-2 px-2.5 py-1.5"
           >
             GitHub
