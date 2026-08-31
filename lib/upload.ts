@@ -8,6 +8,7 @@ import type {
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { AppError } from "./errors";
+import { asHtmlFile } from "./markdown";
 import { pasteUrls } from "./urls";
 import { MAX_UPLOAD_BYTES } from "@/convex/lib/validation";
 
@@ -74,12 +75,17 @@ export async function uploadFile(
  * Uploads HTML and creates the paste that points at it. If the create fails the
  * uploaded bytes are simply left unreferenced; `storage.sweepOrphans` reclaims
  * them, so there is nothing to unwind here.
+ *
+ * A Markdown file is rendered to HTML first (see `lib/markdown.ts`), which is
+ * why this and `replaceHtml` are the only two places that had to learn about
+ * Markdown at all: every publishing surface goes through one of them.
  */
 export async function publishHtml(
   convex: Mutator,
-  file: File,
+  input: File,
   options: PublishOptions = {},
 ): Promise<PublishResult> {
+  const file = await asHtmlFile(input);
   const storageId = await uploadFile(convex, file);
   const created = await convex.mutation(api.pastes.create, {
     storageId,
@@ -96,9 +102,10 @@ export async function publishHtml(
  */
 export async function replaceHtml(
   convex: Mutator,
-  file: File,
+  input: File,
   paste: { token: string; updateToken?: string; apiKey?: string },
 ): Promise<void> {
+  const file = await asHtmlFile(input);
   const storageId = await uploadFile(convex, file);
   await convex.mutation(api.pastes.replaceContent, {
     ...paste,

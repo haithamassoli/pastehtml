@@ -28,6 +28,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PublishResult | null>(null);
   const [text, setText] = useState("");
+  // Only the pasted-text path needs this: a dropped file already says which it
+  // is by its extension, and `lib/markdown.ts` reads that.
+  const [mode, setMode] = useState<"html" | "markdown">("html");
   const [dragging, setDragging] = useState(false);
 
   async function publish(file: File) {
@@ -101,7 +104,7 @@ export default function Home() {
             </svg>
           </span>
           <span className="font-display text-3xl tracking-wide sm:text-4xl">
-            Drop an HTML file here
+            Drop an HTML or Markdown file here
           </span>
           <span className="text-muted-foreground text-sm">
             or click to choose one — up to{" "}
@@ -109,7 +112,7 @@ export default function Home() {
           </span>
           <input
             type="file"
-            accept=".html,.htm,text/html"
+            accept=".html,.htm,.md,.markdown,text/html,text/markdown"
             className="sr-only"
             disabled={busy}
             onChange={(event) => {
@@ -143,7 +146,7 @@ export default function Home() {
       </section>
 
       <section className="panel p-5 sm:p-7">
-        <h2 className="text-3xl sm:text-4xl">Or paste HTML</h2>
+        <h2 className="text-3xl sm:text-4xl">Or paste it in</h2>
         <p className="text-muted-foreground mt-2 max-w-[52ch] text-sm">
           Straight into the box. It gets the same URL a dropped file would.
         </p>
@@ -151,11 +154,16 @@ export default function Home() {
           className="mt-4 flex flex-col gap-4"
           onSubmit={(event) => {
             event.preventDefault();
-            void publish(new File([text], "index.html", { type: "text/html" }));
+            void publish(
+              mode === "markdown"
+                ? new File([text], "index.md", { type: "text/markdown" })
+                : new File([text], "index.html", { type: "text/html" }),
+            );
           }}
         >
+          <ModeChoice value={mode} onChange={setMode} />
           <label htmlFor="html" className="sr-only">
-            Or paste HTML
+            {mode === "markdown" ? "Markdown to publish" : "HTML to publish"}
           </label>
           <textarea
             id="html"
@@ -163,7 +171,7 @@ export default function Home() {
             onChange={(event) => setText(event.target.value)}
             rows={7}
             spellCheck={false}
-            placeholder="<h1>Hello</h1>"
+            placeholder={mode === "markdown" ? "# Hello" : "<h1>Hello</h1>"}
             className="border-ink shadow-comic-xs bg-background focus-visible:outline-hero-blue border-2 p-3 font-mono text-sm outline-none focus-visible:outline-3 focus-visible:-outline-offset-1"
           />
           <div className="flex flex-wrap items-center gap-4">
@@ -183,6 +191,42 @@ export default function Home() {
 
       <ApiExample />
     </main>
+  );
+}
+
+/**
+ * Which language the box holds. Radios rather than a pair of toggle buttons
+ * because the two options are exactly one choice, and that is what a screen
+ * reader should hear.
+ */
+function ModeChoice({
+  value,
+  onChange,
+}: {
+  value: "html" | "markdown";
+  onChange: (value: "html" | "markdown") => void;
+}) {
+  return (
+    <fieldset className="flex flex-wrap items-center gap-2">
+      <legend className="sr-only">Format</legend>
+      {(["html", "markdown"] as const).map((option) => (
+        <label
+          key={option}
+          className={`border-ink shadow-comic-xs has-[:focus-visible]:outline-hero-blue cursor-pointer border-2 px-3 py-1.5 font-mono text-xs font-semibold tracking-[0.12em] uppercase has-[:focus-visible]:outline-3 has-[:focus-visible]:-outline-offset-1 ${
+            value === option ? "bg-hero-yellow" : "bg-background hover:bg-card"
+          }`}
+        >
+          <input
+            type="radio"
+            name="format"
+            className="sr-only"
+            checked={value === option}
+            onChange={() => onChange(option)}
+          />
+          {option}
+        </label>
+      ))}
+    </fieldset>
   );
 }
 
@@ -207,7 +251,8 @@ function Hero() {
             Publish HTML, get a URL
           </h1>
           <p className="text-muted-foreground mt-5 max-w-[46ch] text-lg">
-            Drop an HTML file and it goes live instantly. No account needed.
+            Drop an HTML or Markdown file and it goes live instantly. No account
+            needed.
           </p>
           {/* Only once Convex holds the token, so this is also the honest signal
               that the next publish will be owned rather than anonymous. */}

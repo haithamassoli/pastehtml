@@ -176,12 +176,12 @@ function PasteDetail({ token }: { token: string }) {
         </form>
       </Section>
 
-      <Section title="Replace HTML">
+      <Section title="Replace content">
         <input
           type="file"
-          accept=".html,.htm,text/html"
+          accept=".html,.htm,.md,.markdown,text/html,text/markdown"
           disabled={busy}
-          aria-label="Replace HTML"
+          aria-label="Replace content"
           className="text-sm"
           onChange={(event) => {
             const file = event.target.files?.[0];

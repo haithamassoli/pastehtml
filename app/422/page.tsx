@@ -42,7 +42,10 @@ export default function Unprocessable() {
         </Rule>
         <Rule label="Type">
           <code className="font-mono">text/html</code> or{" "}
-          <code className="font-mono">text/plain</code>, and never empty.
+          <code className="font-mono">text/plain</code>, and never empty. A{" "}
+          <code className="font-mono">.md</code> file — or a{" "}
+          <code className="font-mono">text/markdown</code> body — is rendered to
+          HTML before it is stored, so it lands here as HTML too.
         </Rule>
         <Rule label="Filename">
           Up to {MAX_FILENAME_LENGTH} characters, with no slashes or control

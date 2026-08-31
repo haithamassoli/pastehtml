@@ -88,6 +88,23 @@ string, all optional:
 | `subdomain`   | Custom subdomain instead of the generated token      |
 | `folderId`    | Folder to file it under (authenticated callers only) |
 
+### Markdown
+
+Send `Content-Type: text/markdown`, or a `filename` ending in `.md` /
+`.markdown`, and the body is rendered to a styled, self-contained HTML page
+before it is stored. Everything after that is identical to an HTML paste: the
+same token, the same origin, and `/raw` returns the rendered HTML — the Markdown
+source is not kept.
+
+```bash
+curl -X POST https://pastehtml.assoli.site/api/v1/pastes \
+     -H 'Content-Type: text/markdown' --data-binary @notes.md
+```
+
+GitHub-flavoured: tables, task lists, strikethrough and autolinks. Raw HTML in
+the Markdown is passed through, exactly as it would be in an `.html` upload. The
+document's first `# heading` becomes its `<title>`, falling back to the filename.
+
 ```jsonc
 // 201 Created
 {
@@ -187,7 +204,7 @@ Success is always `{ "data": … }`; failure is always
 | `NOT_FOUND`              | 404    | No such paste or folder                         |
 | `CONFLICT`               | 409    | Subdomain taken or reserved                     |
 | `PAYLOAD_TOO_LARGE`      | 413    | HTML over 5 MB                                  |
-| `UNSUPPORTED_MEDIA_TYPE` | 415    | Content type is not `text/html` or `text/plain` |
+| `UNSUPPORTED_MEDIA_TYPE` | 415    | Stored type is not `text/html` or `text/plain`  |
 | `RATE_LIMITED`           | 429    | Too many requests                               |
 | `INTERNAL`               | 500    | Our fault — quote the `X-Request-Id`            |
 

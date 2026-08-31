@@ -47,7 +47,7 @@ test("publishes an HTML file dropped onto the page", async ({ page }) => {
     return transfer;
   });
   await page
-    .locator('label:has-text("Drop an HTML file here")')
+    .locator('label:has-text("Drop an HTML or Markdown file here")')
     .dispatchEvent("drop", { dataTransfer });
 
   await expect(page.getByRole("heading", { name: "Published" })).toBeVisible();
@@ -61,4 +61,50 @@ test("publishes an HTML file dropped onto the page", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "dropped in",
   );
+});
+
+test("renders a Markdown file to HTML at publish", async ({ page }) => {
+  await page.goto("/");
+
+  await page.setInputFiles('input[type="file"]', {
+    name: "notes.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Release plan\n\n- one\n- two\n"),
+  });
+
+  await expect(page.getByRole("heading", { name: "Published" })).toBeVisible();
+
+  // What went live is HTML, not the Markdown source: the conversion happens at
+  // ingest, so every surface below serves an ordinary HTML paste.
+  const publicUrl = (await page
+    .getByRole("link", { name: /^http/ })
+    .first()
+    .textContent())!;
+  await page.goto(publicUrl);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Release plan",
+  );
+  await expect(page.getByRole("listitem")).toHaveCount(2);
+  // The document's own H1 names the page.
+  await expect(page).toHaveTitle("Release plan");
+});
+
+test("publishes Markdown typed into the paste box", async ({ page }) => {
+  await page.goto("/");
+
+  // The radio itself is `sr-only`; the label is what a pointer user clicks and
+  // what forwards the click to it.
+  await page.locator("label", { hasText: /^markdown$/ }).click();
+  await expect(page.getByRole("radio", { name: "markdown" })).toBeChecked();
+  await page.getByLabel("Markdown to publish").fill("# Typed in\n\nHello.");
+  await page.getByRole("button", { name: "Publish" }).click();
+
+  await expect(page.getByRole("heading", { name: "Published" })).toBeVisible();
+
+  const publicUrl = (await page
+    .getByRole("link", { name: /^http/ })
+    .first()
+    .textContent())!;
+  await page.goto(publicUrl);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Typed in");
 });

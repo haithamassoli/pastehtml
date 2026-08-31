@@ -19,7 +19,7 @@ import "./globals.css";
 
 const TITLE = "pastehtml — publish HTML, get a URL";
 const DESCRIPTION =
-  "Drop an HTML file and it goes live instantly on its own URL. No account needed. Publish from the browser, a terminal, the REST API or an MCP agent.";
+  "Drop an HTML or Markdown file and it goes live instantly on its own URL. No account needed. Publish from the browser, a terminal, the REST API or an MCP agent.";
 
 /**
  * `metadataBase` is what turns every relative URL below — the OG image, the

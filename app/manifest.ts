@@ -17,7 +17,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "pastehtml — publish HTML, get a URL",
     short_name: "pastehtml",
     description:
-      "Drop an HTML file and it goes live instantly on its own URL. No account needed.",
+      "Drop an HTML or Markdown file and it goes live instantly on its own URL. No account needed.",
     lang: "en",
     dir: "ltr",
     start_url: "/",

@@ -5,7 +5,7 @@
 <h1 align="center">pastehtml.assoli.site</h1>
 
 <p align="center">
-  Drop an HTML file, get a public URL on its own origin. No account, no build step.<br>
+  Drop an HTML or Markdown file, get a public URL on its own origin. No account, no build step.<br>
   <a href="https://pastehtml.assoli.site">pastehtml.assoli.site</a> · <a href="docs/api.md">REST API</a> · <a href="docs/mcp.md">MCP</a>
 </p>
 
@@ -15,6 +15,9 @@
 
 - **Publish in one step** — drop a file, paste markup, `curl` it, or hand it to an
   agent over MCP. Every route ends at the same Convex function.
+- **HTML or Markdown** — a `.md` file is rendered to a styled, self-contained HTML
+  page at upload, so the stored paste is real HTML and every surface below it —
+  the live origin, `/raw`, the sandboxed preview, the ETag — is unchanged.
 - **Its own origin per paste** — `<token>.pastehtml.assoli.site`, so uploaded HTML
   never shares an origin with the dashboard or a Clerk session.
 - **Optional account** — publish anonymously, then claim the paste later with the

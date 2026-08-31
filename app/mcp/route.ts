@@ -138,9 +138,14 @@ function mcpServer(credentials: ApiCredentials, requestId: string) {
         html: z
           .string()
           .describe(
-            `The complete HTML document, at most ${config.maxUploadBytes} bytes.`,
+            `The complete HTML document, at most ${config.maxUploadBytes} bytes. May instead be Markdown, if filename ends in .md or .markdown.`,
           ),
-        filename: z.string().optional().describe("Defaults to index.html."),
+        filename: z
+          .string()
+          .optional()
+          .describe(
+            "Defaults to index.html. Name it .md or .markdown and the content is treated as Markdown and rendered to a styled HTML page before it is stored.",
+          ),
         title: z.string().optional(),
         description: z.string().optional(),
         subdomain: z
@@ -229,7 +234,9 @@ function mcpServer(credentials: ApiCredentials, requestId: string) {
         html: z
           .string()
           .optional()
-          .describe("New HTML document. Replaces the stored content entirely."),
+          .describe(
+            "New HTML document. Replaces the stored content entirely. Markdown instead, if filename ends in .md or .markdown.",
+          ),
         filename: z.string().optional(),
         title: z.string().optional(),
         description: z.string().optional(),
