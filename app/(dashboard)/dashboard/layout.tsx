@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { buttonVariants } from "@/components/ui/button";
@@ -12,6 +13,15 @@ import { buttonVariants } from "@/components/ui/button";
 // must-revalidate`. Nothing to configure — one user's pastes must never be
 // served to another, and the guard that enforces that is the same fact that
 // stops the response being stored.
+// Every page below is `"use client"` and cannot export its own metadata, so the
+// tab label is settled here for all of them. `index: false` is the half that
+// robots.txt cannot do: `Disallow` stops the crawl, not the indexing of a URL
+// someone linked to.
+export const metadata: Metadata = {
+  title: "Dashboard",
+  robots: { index: false, follow: false },
+};
+
 export default async function DashboardLayout({
   children,
 }: {

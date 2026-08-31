@@ -5,8 +5,13 @@
 // scoped to the dashboard; nothing in it was dashboard-specific, and the rest
 // of the app had no boundary at all.
 //
+// Wears `StatusPage` like 404 and 422 do, so the three read as one set. The
+// panel is the alert, hence `role="alert"` on the wrapper rather than a second
+// box inside it.
+//
 // Next 16 renamed this second prop from `reset` to `retry`.
 import { Button } from "@/components/ui/button";
+import { StatusPage } from "@/components/status-page";
 import { errorMessage } from "@/lib/errors";
 
 export default function AppError({
@@ -17,22 +22,19 @@ export default function AppError({
   retry: () => void;
 }) {
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-4 p-6">
-      <div
-        role="alert"
-        className="border-ink shadow-comic bg-card flex flex-col items-start gap-3 border-3 p-6"
-      >
-        <p className="font-medium">Something went wrong</p>
-        <p className="text-muted-foreground text-sm">{errorMessage(error)}</p>
-        {error.digest && (
-          <p className="text-muted-foreground font-mono text-xs">
-            {error.digest}
-          </p>
-        )}
-        <Button variant="outline" size="sm" onClick={retry}>
+    <StatusPage
+      code="500"
+      title="Something went wrong"
+      role="alert"
+      actions={
+        <Button variant="outline" onClick={retry}>
           Try again
         </Button>
-      </div>
-    </main>
+      }
+    >
+      <p>{errorMessage(error)}</p>
+      {/* The one string support can match against a server log. */}
+      {error.digest && <p className="font-mono text-xs">{error.digest}</p>}
+    </StatusPage>
   );
 }
