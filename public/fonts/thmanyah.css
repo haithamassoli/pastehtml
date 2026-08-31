@@ -43,3 +43,13 @@
 :lang(ar):not([dir]) {
   direction: rtl;
 }
+
+/* The font's stylistic alternates — what headings are drawn with everywhere. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-feature-settings: "salt" 1;
+}
