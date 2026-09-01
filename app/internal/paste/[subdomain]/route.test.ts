@@ -78,6 +78,50 @@ describe("paste runtime", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("answers a link unfurler with the card instead of the paste", async () => {
+    query.mockResolvedValue({
+      ...PASTE,
+      title: "My <page>",
+      description: "A demo",
+    });
+
+    const response = await get({
+      "user-agent": "facebookexternalhit/1.1 Twitterbot/1.0",
+    });
+    const body = await response.text();
+
+    expect(body).toContain(
+      '<meta property="og:title" content="My &lt;page&gt;">',
+    );
+    expect(body).toContain('<meta property="og:description" content="A demo">');
+    expect(body).toContain(
+      '<meta property="og:image" content="http://localhost:3000/opengraph-image">',
+    );
+    expect(body).toContain(
+      '<meta name="twitter:card" content="summary_large_image">',
+    );
+    expect(body).toContain(
+      '<meta property="og:url" content="http://abc123def456.localhost/">',
+    );
+    // The card is not the paste: nothing is read from storage, nobody is
+    // counted as a reader, and no cache may hand it to a person.
+    expect(fetch).not.toHaveBeenCalled();
+    expect(after).not.toHaveBeenCalled();
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+  });
+
+  it("falls back to the filename and still serves the page to a person", async () => {
+    query.mockResolvedValue({ ...PASTE, filename: "index.html" });
+
+    const card = await get({ "user-agent": "Slackbot-LinkExpanding 1.0" });
+    expect(await card.text()).toContain(
+      '<meta property="og:title" content="index.html">',
+    );
+
+    const page = await get({ "user-agent": "Mozilla/5.0 Chrome/120" });
+    expect(await page.text()).toContain("<h1>runtime</h1>");
+  });
+
   it("serves the stored HTML with its own content type, plus the font", async () => {
     const response = await get();
     const body = await response.text();

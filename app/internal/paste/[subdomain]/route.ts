@@ -5,6 +5,7 @@
 import { after, type NextRequest } from "next/server";
 import { api } from "@/convex/_generated/api";
 import { convex, lookupPaste, plain, serveStored } from "@/lib/paste-http";
+import { config } from "@/lib/config";
 import { UNLOCK_COOKIE, readCookie } from "@/lib/host";
 import { challengePage } from "./challenge";
 
@@ -22,6 +23,15 @@ export async function GET(
   if (paste.disabled) return plain(410, "This paste has been disabled.");
   if (paste.locked) return challenge();
   if (!paste.url) return plain(404, "Paste content is unavailable.");
+
+  // A link unfurler gets the card instead of the page: uploaded HTML rarely
+  // carries Open Graph tags of its own, and the ones we would add cannot be put
+  // where they belong — appending to the stored bytes lands them after
+  // `</html>`, which is not the `<head>` every scraper reads. It is also the
+  // only branch that skips the storage read, and it happens before the view
+  // count, so an unfurl is never a reader.
+  if (isUnfurler(request.headers.get("user-agent")))
+    return card(request, paste);
 
   // Analytics never blocks delivery: `after` runs once the response is sent.
   // A bot is traffic, not a reader, so it is not recorded at all — neither the
@@ -52,6 +62,103 @@ export async function GET(
     },
   );
 }
+
+/**
+ * The scrapers that fetch a URL only to draw a preview of it — never a person,
+ * never an indexer, so nothing here changes what a search engine sees. Apple's
+ * Messages sends the Facebook and X agents together, hence no separate entry.
+ *
+ * ponytail: a substring list. A network not on it gets the page instead of the
+ * card, which is what happens today; add the agent when one shows up.
+ */
+const UNFURLERS =
+  /facebookexternalhit|twitterbot|slackbot|discordbot|linkedinbot|whatsapp|telegrambot|pinterest|redditbot|skypeuripreview|embedly|iframely|mastodon|bluesky|vkshare|flipboard/;
+
+const isUnfurler = (header: string | null) =>
+  UNFURLERS.test(header?.toLowerCase() ?? "");
+
+/**
+ * The paste's link card. The image is the site's own — one drawing, already
+ * built and cached, rather than a per-paste render; the words are the paste's.
+ * Never stored by a cache, because which document this origin answers with
+ * depends on who asked.
+ */
+function card(
+  request: NextRequest,
+  paste: {
+    filename: string;
+    title?: string;
+    description?: string;
+  },
+) {
+  const app = config.appUrl.replace(/\/$/, "");
+  const host = request.headers.get("host") ?? new URL(request.url).host;
+  const url = `${isSecure(request) ? "https" : "http"}://${host}/`;
+  const title = paste.title || paste.filename;
+  const description =
+    paste.description ||
+    `Published with ${config.appName}. Open the page to view it.`;
+
+  const meta = [
+    ["og:type", "website"],
+    ["og:site_name", config.appName],
+    ["og:url", url],
+    ["og:title", title],
+    ["og:description", description],
+    ["og:image", `${app}/opengraph-image`],
+    ["og:image:width", "1200"],
+    ["og:image:height", "630"],
+    [
+      "og:image:alt",
+      `${config.appName} — publish HTML and get an instant public URL`,
+    ],
+  ]
+    .map(
+      ([property, content]) =>
+        `<meta property="${property}" content="${escapeHtml(content)}">`,
+    )
+    .concat(
+      [
+        ["twitter:card", "summary_large_image"],
+        ["twitter:title", title],
+        ["twitter:description", description],
+        ["twitter:image", `${app}/twitter-image`],
+      ].map(
+        ([name, content]) =>
+          `<meta name="${name}" content="${escapeHtml(content)}">`,
+      ),
+    )
+    .join("\n");
+
+  return new Response(
+    `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>${escapeHtml(title)}</title>
+<link rel="canonical" href="${escapeHtml(url)}">
+${meta}
+</head>
+<body><a href="${escapeHtml(url)}">${escapeHtml(title)}</a></body>
+</html>`,
+    {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    },
+  );
+}
+
+/** Enough for text going into an attribute or a text node. */
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 
 /**
  * The unlock challenge. Verification happens in Convex, which throttles by

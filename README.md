@@ -296,6 +296,13 @@ production. The card image is drawn at `app/opengraph-image.tsx` through
 place instead of in a committed PNG. `app/twitter-image.tsx` re-exports it: X's
 card is the same 1200x630 crop.
 
+Paste origins get a card too. Uploaded HTML rarely declares Open Graph tags,
+and there is nowhere to add them to it — anything appended to the stored bytes
+lands after `</html>`, not in the `<head>` a scraper reads — so the runtime
+answers a known unfurler (`facebookexternalhit`, `Twitterbot`, Slack, Discord,
+…) with a small card document instead: the paste's title and description over
+the site's own image. Everyone else, search engines included, gets the page.
+
 `app/manifest.ts`, `app/icon.svg`, `app/apple-icon.png` and `public/icon-*.png`
 make the app installable; `public/sw.js` is a hand-written service worker (~40
 lines, no build step) that precaches `/offline` and answers a failed page

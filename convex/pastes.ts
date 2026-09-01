@@ -525,6 +525,10 @@ export const resolveForRuntime = query({
       token: v.string(),
       // The uploaded name, for the raw endpoint's `Content-Disposition`.
       filename: v.string(),
+      // Only the link card on the paste origin reads these two. Already public
+      // through `getByToken`, so returning them discloses nothing new.
+      title: v.optional(v.string()),
+      description: v.optional(v.string()),
       visibility: v.union(v.literal("public"), v.literal("protected")),
       // Password protected, and this caller has not unlocked it.
       locked: v.boolean(),
@@ -562,6 +566,8 @@ export const resolveForRuntime = query({
     return {
       token: paste.token,
       filename: paste.filename,
+      title: paste.title,
+      description: paste.description,
       visibility: paste.visibility,
       locked,
       disabled,
