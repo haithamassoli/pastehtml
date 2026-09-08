@@ -65,6 +65,17 @@ describe("wildcard paste hosts", () => {
     expect(clerk).not.toHaveBeenCalled();
   });
 
+  it("serves the app's favicon on a paste origin", async () => {
+    const response = await run(
+      "http://abc.localhost:3000/favicon.ico",
+      "abc.localhost:3000",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+    expect(clerk).not.toHaveBeenCalled();
+  });
+
   it("strips app credentials before the runtime sees the request", async () => {
     const response = await run(
       "http://abc123.localhost:3000/",

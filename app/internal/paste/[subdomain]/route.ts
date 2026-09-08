@@ -136,6 +136,7 @@ function card(
 <head>
 <meta charset="utf-8">
 <title>${escapeHtml(title)}</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="canonical" href="${escapeHtml(url)}">
 ${meta}
 </head>

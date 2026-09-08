@@ -19,6 +19,15 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
   const subdomain = pasteSubdomain(host);
 
   if (subdomain) {
+    // The app's own favicon, served on the paste origin. Uploaded HTML rarely
+    // links one, and a browser then asks this origin for `/favicon.ico` — a 404
+    // there is a blank tab icon on every paste. Path-based routing means
+    // falling through hands back `app/favicon.ico`, still without Clerk.
+    if (request.nextUrl.pathname === "/favicon.ico")
+      return NextResponse.next({
+        request: { headers: withoutCredentials(request.headers) },
+      });
+
     // Paste origins never reach Clerk: no handshake, no session cookie, no
     // main-app credentials obtainable by the HTML we are about to serve.
     if (!isRuntimePath(request.nextUrl.pathname))
