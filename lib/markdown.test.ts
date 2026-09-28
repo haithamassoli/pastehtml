@@ -54,6 +54,18 @@ describe("asHtmlFile", () => {
     expect(text).not.toContain("<title><script>");
   });
 
+  it("ships a reader theme picker, light and dark, defaulting to the system", async () => {
+    const text = await (
+      await asHtmlFile(file("x.md", "text/markdown", "# Hi"))
+    ).text();
+    for (const id of ["paper", "sepia", "white", "ink", "slate", "black"]) {
+      expect(text).toContain(`<option value="${id}">`);
+      expect(text).toContain(`[data-theme="${id}"] {`);
+    }
+    expect(text).toContain('<option value="auto">Auto</option>');
+    expect(text).toContain("@media (prefers-color-scheme: dark)");
+  });
+
   it("falls back to the filename when there is no heading", async () => {
     const out = await asHtmlFile(
       file("plan.md", "text/markdown", "just prose"),

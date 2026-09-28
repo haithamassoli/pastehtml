@@ -89,6 +89,41 @@ test("renders a Markdown file to HTML at publish", async ({ page }) => {
   await expect(page).toHaveTitle("Release plan");
 });
 
+test("lets the reader pick a Markdown theme, and remembers it", async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/");
+  await page.setInputFiles('input[type="file"]', {
+    name: "themes.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("# Themes\n\nHello."),
+  });
+  await expect(page.getByRole("heading", { name: "Published" })).toBeVisible();
+  const publicUrl = (await page
+    .getByRole("link", { name: /^http/ })
+    .first()
+    .textContent())!;
+  await page.goto(publicUrl);
+
+  const background = () =>
+    page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const picker = page.getByLabel("Theme");
+
+  // No choice yet: a dark system gets Ink.
+  await expect(picker).toHaveValue("auto");
+  expect(await background()).toBe("rgb(24, 18, 14)");
+
+  await picker.selectOption("sepia");
+  expect(await background()).toBe("rgb(244, 236, 216)");
+  await picker.selectOption("black");
+  expect(await background()).toBe("rgb(0, 0, 0)");
+
+  await page.reload();
+  await expect(picker).toHaveValue("black");
+  expect(await background()).toBe("rgb(0, 0, 0)");
+});
+
 test("publishes Markdown typed into the paste box", async ({ page }) => {
   await page.goto("/");
 

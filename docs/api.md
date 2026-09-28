@@ -104,6 +104,8 @@ curl -X POST https://pastehtml.assoli.site/api/v1/pastes \
 GitHub-flavoured: tables, task lists, strikethrough and autolinks. Raw HTML in
 the Markdown is passed through, exactly as it would be in an `.html` upload. The
 document's first `# heading` becomes its `<title>`, falling back to the filename.
+The page carries a reader theme picker: Paper, Sepia and White for day, Ink,
+Slate and Black for night. It follows the system until the reader picks one.
 
 ```jsonc
 // 201 Created
